@@ -739,6 +739,8 @@ public class Messages extends NLS {
 
   public static String wizardImportPageBrowse;
 
+  public static String wizardImportPageFilter;
+
   public static String wizardImportPageRoot;
 
   public static String locationComponentLocation;
