@@ -72,6 +72,7 @@ import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
+import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.Tree;
 import org.eclipse.ui.IWorkingSet;
 
@@ -121,6 +122,8 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
   private Button createWorkingSet;
 
   private Combo workingSetName;
+
+  private String filter;
 
   private String preselectedWorkingSetName;
 
@@ -225,6 +228,22 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
       });
     }
 
+    final Label selectRootDirectoryLabel = new Label(composite, SWT.NONE);
+    selectRootDirectoryLabel.setLayoutData(new GridData());
+    selectRootDirectoryLabel.setText(Messages.wizardImportPageFilter);
+
+    final Text filterText = new Text(composite, SWT.BORDER);
+    filterText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+    filterText.setEditable(true);
+    filterText.addModifyListener(new ModifyListener() {
+
+      public void modifyText(ModifyEvent t) {
+        filter = filterText.getText();
+        projectTreeViewer.refresh();
+      }
+    });
+    // TODO: wenn Text verringert wird, wird nicht alles automatisch selektiert
+
     final Label projectsLabel = new Label(composite, SWT.NONE);
     projectsLabel.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false, 3, 1));
     projectsLabel.setText(Messages.wizardImportPageProjects);
@@ -278,6 +297,23 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
         } else if(parentElement instanceof MavenProjectInfo) {
           MavenProjectInfo mavenProjectInfo = (MavenProjectInfo) parentElement;
           Collection<MavenProjectInfo> projects = mavenProjectInfo.getProjects();
+          // ===>
+          if(filter != null && filter.length() > 0) {
+            ArrayList<MavenProjectInfo> filteredProjects = new ArrayList<MavenProjectInfo>();
+            for(MavenProjectInfo p : projects) {
+              if(p.getProjects().isEmpty()) {
+                if(p.getModel().getArtifactId().contains(filter)) {
+                  filteredProjects.add(p);
+                }
+              } else {
+                if(hasAnyChildAppliesToFilter(p, filter)) {
+                  filteredProjects.add(p);
+                }
+              }
+            }
+            return filteredProjects.toArray(new MavenProjectInfo[filteredProjects.size()]);
+          }
+          // <===
           return projects.toArray(new MavenProjectInfo[projects.size()]);
         }
         return EMPTY;
@@ -758,8 +794,8 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
   /**
    * ProjectLabelProvider
    */
-  class ProjectLabelProvider extends LabelProvider implements IColorProvider,
-      DelegatingStyledCellLabelProvider.IStyledLabelProvider {
+  class ProjectLabelProvider extends LabelProvider
+      implements IColorProvider, DelegatingStyledCellLabelProvider.IStyledLabelProvider {
 
     public String getText(Object element) {
       if(element instanceof MavenProjectInfo) {
@@ -849,5 +885,17 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
    */
   public void setWorkingSetName(String workingSetName) {
     this.preselectedWorkingSetName = workingSetName;
+  }
+
+  private boolean hasAnyChildAppliesToFilter(MavenProjectInfo project, String filter) {
+    if(project.getProjects().isEmpty()) {
+      return project.getModel().getArtifactId().contains(filter);
+    }
+    for(MavenProjectInfo p : project.getProjects()) {
+      if(hasAnyChildAppliesToFilter(p, filter)) {
+        return true;
+      }
+    }
+    return false;
   }
 }
