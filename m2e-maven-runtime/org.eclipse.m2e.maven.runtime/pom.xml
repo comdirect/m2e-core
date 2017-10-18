@@ -13,7 +13,7 @@
   <parent>
     <groupId>org.eclipse.m2e</groupId>
     <artifactId>m2e-maven-runtime</artifactId>
-    <version>1.7.0-SNAPSHOT</version>
+    <version>1.8.1-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.m2e.maven.runtime</artifactId>
@@ -26,7 +26,7 @@
     <maven-core.version>3.3.9</maven-core.version>
     <!-- below are m2e-specific addons -->
     <plexus-build-api.version>0.0.7</plexus-build-api.version>
-    <okhttp-connector.version>0.16.0</okhttp-connector.version>
+    <okhttp-connector.version>0.17.2</okhttp-connector.version>
   </properties>
 
   <dependencies>
@@ -134,11 +134,12 @@
             </_exportcontents>
 
             <Import-Package>
-              !*
+              org.slf4j;version="1.6.2",
+              org.slf4j.spi;version="1.6.2",
+              org.slf4j.helpers;version="1.6.2",
             </Import-Package>
             <Require-Bundle>
-              org.slf4j.api;bundle-version="1.6.2",
-              org.eclipse.m2e.maven.runtime.slf4j.simple;bundle-version="[1.7.0,1.8.0)",
+              org.eclipse.m2e.maven.runtime.slf4j.simple;bundle-version="[1.8.1,1.9.0)",
               javax.inject;bundle-version="1.0.0";visibility:=reexport
             </Require-Bundle>
 
