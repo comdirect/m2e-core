@@ -22,7 +22,7 @@
 
   <groupId>org.eclipse.m2e</groupId>
   <artifactId>m2e-core</artifactId>
-  <version>1.7.0-SNAPSHOT</version>
+  <version>1.8.1-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Maven Integration for Eclipse (parent)</name>
@@ -36,11 +36,11 @@
 
     <m2e-maven-runtime.version>${project.version}</m2e-maven-runtime.version>
 
-    <tycho-version>0.25.0</tycho-version>
+    <tycho-version>1.0.0</tycho-version>
     <tycho-extras-version>${tycho-version}</tycho-extras-version>
 
     <!-- eclipse version m2e is built against -->
-    <eclipse.stream>neon</eclipse.stream>
+    <eclipse.stream>oxygen</eclipse.stream>
     <eclipse-repo.url>http://download.eclipse.org/releases/${eclipse.stream}</eclipse-repo.url>
   </properties>
 
