@@ -32,6 +32,9 @@ public class Messages extends NLS {
    public static String selectRootDirectoryDialogMessage;
    public static String labelRemoveEclipseFiles;
 
+   public static String selectRootDirectoryMessageNoProjectsFoundTitle;
+   public static String selectRootDirectoryMessageNoProjectsFoundText;
+   
    public static String buttonReloadTooltip;
    public static String buttonCollapseToLevel1Tooltip;
    public static String buttonExpandAllTooltip;
