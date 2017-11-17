@@ -148,7 +148,7 @@ public class ProjectImportView extends ViewPart {
 		filterLabel.setLayoutData(new GridData());
 		filterLabel.setText(Messages.labelFilterProjects);
 
-		filterText = new Text(left, SWT.BORDER);
+		filterText = new Text(left, SWT.BORDER + SWT.SEARCH + SWT.ICON_CANCEL);
 		filterText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 5, 1));
 		filterText.addModifyListener(new FilterChangedHandler());
 
