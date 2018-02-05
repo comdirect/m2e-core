@@ -22,7 +22,7 @@
 
   <groupId>org.eclipse.m2e</groupId>
   <artifactId>m2e-core</artifactId>
-  <version>1.8.1-SNAPSHOT</version>
+  <version>1.8.2-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Maven Integration for Eclipse (parent)</name>
@@ -42,6 +42,7 @@
     <!-- eclipse version m2e is built against -->
     <eclipse.stream>oxygen</eclipse.stream>
     <eclipse-repo.url>http://download.eclipse.org/releases/${eclipse.stream}</eclipse-repo.url>
+    <jdt-repo.url>http://download.eclipse.org/eclipse/updates/4.7-M-builds/</jdt-repo.url>
   </properties>
 
   <organization>
@@ -62,6 +63,11 @@
   </issueManagement>
 
   <repositories>
+    <repository>
+      <id>jdt-beta</id>
+       <layout>p2</layout>
+       <url>${jdt-repo.url}</url>
+     </repository>
     <repository>
       <id>simrel</id>
       <layout>p2</layout>
