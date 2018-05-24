@@ -282,6 +282,11 @@ public class ProjectImportView extends ViewPart
         return true;
     }
 
+    private void warn(String msg)
+    {
+        MavenE4ImportViewPlugin.getDefault().log(IStatus.WARNING, msg);
+    }
+    
     /**
      * Adds all selected {@link MavenProjectInfo} to the list to import.
      */
@@ -691,6 +696,7 @@ public class ProjectImportView extends ViewPart
             projectImportListViewer.setSelection(null);
 
             BufferedReader fileReader = null;
+	    boolean errorDialogShown = false;
             try
             {
                 fileReader = new BufferedReader(new FileReader(file));
@@ -698,6 +704,20 @@ public class ProjectImportView extends ViewPart
                 Set<String> pomsToSelect = new HashSet<>();
                 while ((line = fileReader.readLine()) != null)
                 {
+	            File projectToAdd = new File(root, line);
+         	    pomsToSelect.add(projectToAdd.getAbsolutePath());
+		    if (!projectToAdd.exists())
+		    {
+		        String errMsgStart = "Das angegebene Projekt kann nicht gefunden werden: ";
+		        warn(errMsgStart + projectToAdd.getAbsolutePath());
+		        // open dialog only once
+		        if (!errorDialogShown)
+		        {
+			    MessageDialog.open(MessageDialog.WARNING, this.parent.getShell(), Messages.importSelectionMessageTitle,
+			        errMsgStart + "\r\n\r\n" + projectToAdd.getAbsolutePath() + "\r\n\r\nIst das Root Directory richtig?", SWT.NONE);
+			    errorDialogShown = true;
+		        }
+		    }
                     MavenE4ImportViewPlugin.getDefault().log(IStatus.INFO, "Importing line: " + line);
                     pomsToSelect.add(new File(root, line).getAbsolutePath());
                     projectTreeViewer.resetFilters();
