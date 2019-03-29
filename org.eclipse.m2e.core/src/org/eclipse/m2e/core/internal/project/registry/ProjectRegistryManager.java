@@ -267,11 +267,9 @@ public class ProjectRegistryManager {
    *             {@link #refresh(Set, IProgressMonitor)} instead.
    */
   public void refresh(final MavenUpdateRequest request, final IProgressMonitor monitor) throws CoreException {
-    getMaven().execute(request.isOffline(), request.isForceDependencyUpdate(), new ICallable<Void>() {
-      public Void call(IMavenExecutionContext context, IProgressMonitor monitor) throws CoreException {
+    getMaven().execute(request.isOffline(), request.isForceDependencyUpdate(), (context, pm) -> {
         refresh(request.getPomFiles(), monitor);
         return null;
-      }
     }, monitor);
   }
 
@@ -395,7 +393,7 @@ public class ProjectRegistryManager {
           context.forcePomFiles(newState.getVersionedDependents(mavenArtifactImportCapability, true));
         }
 
-        newFacade = readMavenProjectFacade(pom, context, newState, monitor);
+        newFacade = readMavenProjectFacade(pom, newState, monitor);
       } else {
         // refresh children of deleted/closed parent
         if(oldFacade != null) {
@@ -472,7 +470,7 @@ public class ProjectRegistryManager {
         MavenProject mavenProject = getMavenProject(newFacade);
         if(mavenProject == null) {
           // facade from workspace state that has not been refreshed yet 
-          newFacade = readMavenProjectFacade(pom, context, newState, monitor);
+          newFacade = readMavenProjectFacade(pom, newState, monitor);
         } else {
           // recreate facade instance to trigger project changed event
           // this is only necessary for facades that are refreshed because their dependencies changed
@@ -487,13 +485,10 @@ public class ProjectRegistryManager {
         final MavenProjectFacade _newFacade = newFacade;
         final MavenProject mavenProject = getMavenProject(newFacade);
         final ResolverConfiguration resolverConfiguration = _newFacade.getResolverConfiguration();
-        final ICallable<Void> callable = new ICallable<Void>() {
-          public Void call(IMavenExecutionContext executionContext, IProgressMonitor monitor) throws CoreException {
-            refreshPhase2(newState, context, originalCapabilities, originalRequirements, pom, _newFacade, monitor);
-            return null;
-          }
-        };
-        createExecutionContext(newState, pom, resolverConfiguration).execute(mavenProject, callable, monitor);
+        createExecutionContext(newState, pom, resolverConfiguration).execute(mavenProject, (executionContext, pm) -> {
+          refreshPhase2(newState, context, originalCapabilities, originalRequirements, pom, _newFacade, pm);
+          return null;
+        }, monitor);
       } else {
         refreshPhase2(newState, context, originalCapabilities, originalRequirements, pom, newFacade, monitor);
       }
@@ -689,19 +684,19 @@ public class ProjectRegistryManager {
     return new DefaultMavenDependencyResolver(this, markerManager);
   }
 
-  private MavenProjectFacade readMavenProjectFacade(final IFile pom, DependencyResolutionContext context,
-      final MutableProjectRegistry state, final IProgressMonitor monitor) throws CoreException {
+  private MavenProjectFacade readMavenProjectFacade(final IFile pom, final MutableProjectRegistry state,
+      final IProgressMonitor monitor) throws CoreException {
     markerManager.deleteMarkers(pom, IMavenConstants.MARKER_POM_LOADING_ID);
 
     final ResolverConfiguration resolverConfiguration = ResolverConfigurationIO
         .readResolverConfiguration(pom.getProject());
 
-    return execute(state, pom, resolverConfiguration, new ICallable<MavenProjectFacade>() {
-      public MavenProjectFacade call(IMavenExecutionContext context, IProgressMonitor monitor) throws CoreException {
+    return execute(state, pom, resolverConfiguration, (executionContext, pm) -> {
         MavenProject mavenProject = null;
         MavenExecutionResult mavenResult = null;
         if(pom.isAccessible()) {
-          mavenResult = getMaven().readMavenProject(pom.getLocation().toFile(), context.newProjectBuildingRequest());
+        mavenResult = getMaven().readMavenProject(pom.getLocation().toFile(),
+            executionContext.newProjectBuildingRequest());
           mavenProject = mavenResult.getProject();
         }
 
@@ -718,7 +713,6 @@ public class ProjectRegistryManager {
         putMavenProject(mavenProjectFacade, mavenProject); // maintain maven project cache
 
         return mavenProjectFacade;
-      }
     }, monitor);
   }
 
@@ -808,13 +802,10 @@ public class ProjectRegistryManager {
       ResolverConfiguration resolverConfiguration, final IProgressMonitor monitor) {
 
     try {
-      return execute(state, pomFile, resolverConfiguration, new ICallable<MavenExecutionResult>() {
-        public MavenExecutionResult call(IMavenExecutionContext context, IProgressMonitor monitor)
-            throws CoreException {
+      return execute(state, pomFile, resolverConfiguration, (context, pm) -> {
           ProjectBuildingRequest configuration = context.newProjectBuildingRequest();
           configuration.setResolveDependencies(true);
           return getMaven().readMavenProject(pomFile.getLocation().toFile(), configuration);
-        }
       }, monitor);
     } catch(CoreException ex) {
       DefaultMavenExecutionResult result = new DefaultMavenExecutionResult();

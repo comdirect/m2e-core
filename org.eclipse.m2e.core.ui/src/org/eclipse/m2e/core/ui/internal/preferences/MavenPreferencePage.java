@@ -68,8 +68,11 @@ public class MavenPreferencePage extends FieldEditorPreferencePage implements IW
     //     Messages.getString( "preferences.updateSnapshots" ), //$NON-NLS-1$
     //     getFieldEditorParent() ) );
 
-    addField(new BooleanFieldEditor(MavenPreferenceConstants.P_DOWNLOAD_SOURCES, //
-        Messages.preferencesDownloadSources, getFieldEditorParent()));
+    BooleanFieldEditor downloadSourcesField = new BooleanFieldEditor(MavenPreferenceConstants.P_DOWNLOAD_SOURCES, //
+        Messages.preferencesDownloadSources, getFieldEditorParent());
+    downloadSourcesField.getDescriptionControl(getFieldEditorParent())
+        .setToolTipText(Messages.preferencesDownloadSourcesTooltip);
+    addField(downloadSourcesField);
 
     addField(new BooleanFieldEditor(MavenPreferenceConstants.P_DOWNLOAD_JAVADOC, //
         Messages.preferencesDownloadJavadoc, getFieldEditorParent()));
@@ -102,6 +105,12 @@ public class MavenPreferencePage extends FieldEditorPreferencePage implements IW
         Messages.preferencesGlobalChecksumPolicy_tooltip);
     addField(checksumPolicy);
 
+    if(M2EUIPluginActivator.showExperimentalFeatures()) {
+      BooleanFieldEditor nullSchedulingRule = new BooleanFieldEditor(
+          MavenPreferenceConstants.P_BUILDER_USE_NULL_SCHEDULING_RULE, Messages.preferencesNullSchedulingRule,
+          getFieldEditorParent());
+      addField(nullSchedulingRule);
+    }
   }
 
   @Override
