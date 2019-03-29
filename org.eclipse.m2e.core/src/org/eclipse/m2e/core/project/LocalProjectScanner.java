@@ -22,6 +22,8 @@ import java.util.Set;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.SubMonitor;
 import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.osgi.util.NLS;
@@ -128,19 +130,24 @@ public class LocalProjectScanner extends AbstractProjectScanner<MavenProjectInfo
     try {
       baseDir = baseDir.getCanonicalFile();
 
-      File pomFile = new File(baseDir, IMavenConstants.POM_FILE_NAME);
-      if(!pomFile.exists()) {
-        return null;
-      }
-
       if(!scannedFolders.add(baseDir)) {
         return null; // we already know this project
         //mkleint: well, if the project is first scanned standalone and later scanned via parent reference, the parent ref gets thrown away??
       }
 
+      File pomFile = new File(baseDir, IMavenConstants.POM_FILE_NAME);
+      if(!pomFile.exists()) {
+        return null;
+      }
+
       Model model = modelManager.readMavenModel(pomFile);
 
       String pomName = modulePath + "/" + IMavenConstants.POM_FILE_NAME; //$NON-NLS-1$
+
+      if(model.getArtifactId() == null) {
+        throw new CoreException(new Status(IStatus.ERROR, IMavenConstants.PLUGIN_ID,
+            NLS.bind(Messages.LocalProjectScanner_missingArtifactId, pomName)));
+      }
 
       MavenProjectInfo projectInfo = newMavenProjectInfo(pomName, pomFile, model, parentInfo);
       //We only want to optionally rename the base directory not any sub directory

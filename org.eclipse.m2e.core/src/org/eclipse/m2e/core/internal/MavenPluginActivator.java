@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2010 Sonatype, Inc.
+ * Copyright (c) 2010, 2018 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -27,8 +27,11 @@ import com.google.inject.Module;
 
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.core.resources.IResourceChangeEvent;
+import org.eclipse.core.resources.ISaveContext;
+import org.eclipse.core.resources.ISaveParticipant;
 import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Plugin;
 
@@ -71,6 +74,7 @@ import org.eclipse.m2e.core.internal.markers.IMavenMarkerManager;
 import org.eclipse.m2e.core.internal.markers.MavenMarkerManager;
 import org.eclipse.m2e.core.internal.preferences.MavenConfigurationImpl;
 import org.eclipse.m2e.core.internal.project.ProjectConfigurationManager;
+import org.eclipse.m2e.core.internal.project.WorkspaceClassifierResolverManager;
 import org.eclipse.m2e.core.internal.project.WorkspaceStateWriter;
 import org.eclipse.m2e.core.internal.project.conversion.ProjectConversionManager;
 import org.eclipse.m2e.core.internal.project.registry.MavenProjectManager;
@@ -78,6 +82,7 @@ import org.eclipse.m2e.core.internal.project.registry.ProjectRegistryManager;
 import org.eclipse.m2e.core.internal.project.registry.ProjectRegistryRefreshJob;
 import org.eclipse.m2e.core.internal.repository.RepositoryRegistry;
 import org.eclipse.m2e.core.project.IProjectConfigurationManager;
+import org.eclipse.m2e.core.project.IWorkspaceClassifierResolverManager;
 import org.eclipse.m2e.core.project.MavenUpdateRequest;
 import org.eclipse.m2e.core.project.conversion.IProjectConversionManager;
 import org.eclipse.m2e.core.repository.IRepositoryRegistry;
@@ -137,9 +142,33 @@ public class MavenPluginActivator extends Plugin {
     }
   };
 
+  private ISaveParticipant saveParticipant = new ISaveParticipant() {
+
+    @Override
+    public void saving(ISaveContext context) throws CoreException {
+      if(managerImpl != null) {
+        managerImpl.writeWorkspaceState();
+      }
+    }
+
+    @Override
+    public void rollback(ISaveContext context) {
+    }
+
+    @Override
+    public void prepareToSave(ISaveContext context) throws CoreException {
+    }
+
+    @Override
+    public void doneSaving(ISaveContext context) {
+    }
+  };
+
   private MavenImpl maven;
 
   private IProjectConversionManager projectConversionManager;
+
+  private IWorkspaceClassifierResolverManager workspaceClassifierResolverManager;
 
   public MavenPluginActivator() {
     plugin = this;
@@ -170,7 +199,7 @@ public class MavenPluginActivator extends Plugin {
     this.bundleContext = context;
 
     try {
-      this.qualifiedVersion = (String) getBundle().getHeaders().get(Constants.BUNDLE_VERSION);
+      this.qualifiedVersion = getBundle().getHeaders().get(Constants.BUNDLE_VERSION);
       Version bundleVersion = Version.parseVersion(this.qualifiedVersion);
       this.version = bundleVersion.getMajor() + "." + bundleVersion.getMinor() + "." + bundleVersion.getMicro(); //$NON-NLS-1$ //$NON-NLS-2$
     } catch(IllegalArgumentException e) {
@@ -252,6 +281,9 @@ public class MavenPluginActivator extends Plugin {
     this.repositoryRegistry.updateRegistry();
 
     this.projectConversionManager = new ProjectConversionManager();
+
+    this.workspaceClassifierResolverManager = new WorkspaceClassifierResolverManager();
+    ResourcesPlugin.getWorkspace().addSaveParticipant(IMavenConstants.PLUGIN_ID, saveParticipant);
   }
 
   private DefaultPlexusContainer newPlexusContainer(ClassLoader cl) throws PlexusContainerException {
@@ -293,7 +325,6 @@ public class MavenPluginActivator extends Plugin {
   public void stop(BundleContext context) throws Exception {
     super.stop(context);
 
-    this.managerImpl.writeWorkspaceState();
     context.removeBundleListener(bundleListener);
 
     this.mavenBackgroundJob.cancel();
@@ -303,6 +334,7 @@ public class MavenPluginActivator extends Plugin {
       // ignored
     }
     IWorkspace workspace = ResourcesPlugin.getWorkspace();
+    workspace.removeSaveParticipant(IMavenConstants.PLUGIN_ID);
     workspace.removeResourceChangeListener(this.mavenBackgroundJob);
     this.mavenBackgroundJob = null;
 
@@ -387,7 +419,7 @@ public class MavenPluginActivator extends Plugin {
 
   public static String getUserAgent() {
     // cast is necessary for eclipse 3.6 compatibility
-    String osgiVersion = (String) Platform
+    String osgiVersion = Platform
         .getBundle("org.eclipse.osgi").getHeaders().get(org.osgi.framework.Constants.BUNDLE_VERSION); //$NON-NLS-1$
     String m2eVersion = plugin.qualifiedVersion;
     String javaVersion = System.getProperty("java.version", "unknown"); //$NON-NLS-1$ $NON-NLS-1$
@@ -474,4 +506,9 @@ public class MavenPluginActivator extends Plugin {
   public IProjectConversionManager getProjectConversionManager() {
     return projectConversionManager;
   }
+
+  public IWorkspaceClassifierResolverManager getWorkspaceClassifierResolverManager() {
+    return workspaceClassifierResolverManager;
+  }
+
 }

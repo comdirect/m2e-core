@@ -13,7 +13,7 @@
   <parent>
     <groupId>org.eclipse.m2e</groupId>
     <artifactId>m2e-maven-runtime</artifactId>
-    <version>1.8.2-SNAPSHOT</version>
+    <version>1.10.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.m2e.maven.runtime</artifactId>
@@ -23,10 +23,15 @@
 
   <properties>
     <!-- maven core version -->
-    <maven-core.version>3.3.9</maven-core.version>
+    <!-- NOTE: When maven-core.version changes, this may impact the versions of the maven-resolver-*
+         jars that export the org.eclipse.aether.* packages in the org.eclipse.m2e.maven.runtime
+         bundle. So the developer must go to the <_exportcontents> section of this file and modify
+         version of the org.eclipse.aether packages accordingly
+         https://bugs.eclipse.org/bugs/show_bug.cgi?id=529540 -->
+    <maven-core.version>3.5.3</maven-core.version>
     <!-- below are m2e-specific addons -->
     <plexus-build-api.version>0.0.7</plexus-build-api.version>
-    <okhttp-connector.version>0.17.2</okhttp-connector.version>
+    <okhttp-connector.version>0.17.4</okhttp-connector.version>
   </properties>
 
   <dependencies>
@@ -70,31 +75,39 @@
       <version>${plexus-build-api.version}</version>
       <optional>true</optional>
     </dependency>
-
-    <dependency>
-      <groupId>org.eclipse.aether</groupId>
-      <artifactId>aether-impl</artifactId>
-      <optional>true</optional>
-    </dependency>
-
     <dependency>
       <groupId>io.takari.aether</groupId>
       <artifactId>aether-connector-okhttp</artifactId>
       <version>${okhttp-connector.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.eclipse.aether</groupId>
+          <artifactId>aether-util</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
-
     <dependency>
-      <groupId>org.eclipse.aether</groupId>
-      <artifactId>aether-connector-basic</artifactId>
+      <groupId>org.apache.maven.resolver</groupId>
+      <artifactId>maven-resolver-impl</artifactId>
+      <optional>true</optional>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.aether</groupId>
-      <artifactId>aether-transport-wagon</artifactId>
+      <groupId>org.apache.maven.resolver</groupId>
+      <artifactId>maven-resolver-connector-basic</artifactId>
+      <optional>true</optional>
     </dependency>
-
+    <dependency>
+      <groupId>org.apache.maven.resolver</groupId>
+      <artifactId>maven-resolver-transport-wagon</artifactId>
+      <optional>true</optional>
+    </dependency>
     <dependency>
       <groupId>org.apache.maven.wagon</groupId>
       <artifactId>wagon-file</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.fusesource.jansi</groupId>
+      <artifactId>jansi</artifactId>
     </dependency>
   </dependencies>
 
@@ -128,7 +141,7 @@
               org.apache.maven.*;provider=m2e;mandatory:=provider,
               org.codehaus.plexus.*;provider=m2e;mandatory:=provider,
               org.sonatype.plexus.*;provider=m2e;mandatory:=provider,
-              org.eclipse.aether.*;provider=m2e;mandatory:=provider,
+              org.eclipse.aether.*;provider=m2e;mandatory:=provider;version=1.1.1,
               com.google.inject.*;provider=m2e;mandatory:=provider,
               io.takari.*;provider=m2e;mandatory:=provider
             </_exportcontents>
@@ -139,7 +152,7 @@
               org.slf4j.helpers;version="1.6.2",
             </Import-Package>
             <Require-Bundle>
-              org.eclipse.m2e.maven.runtime.slf4j.simple;bundle-version="[1.8.1,1.9.0)",
+              org.eclipse.m2e.maven.runtime.slf4j.simple;bundle-version="[1.10.0,1.11.0)",
               javax.inject;bundle-version="1.0.0";visibility:=reexport
             </Require-Bundle>
 

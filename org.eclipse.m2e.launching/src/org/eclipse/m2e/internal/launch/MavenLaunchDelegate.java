@@ -15,14 +15,13 @@ import static org.eclipse.m2e.internal.launch.MavenLaunchUtils.quote;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Collections;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Charsets;
-import com.google.common.io.Files;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -75,6 +74,10 @@ public class MavenLaunchDelegate extends JavaLaunchDelegate implements MavenLaun
   private MavenRuntimeLaunchSupport launchSupport;
 
   private MavenLaunchExtensionsSupport extensionsSupport;
+
+  public MavenLaunchDelegate() {
+    allowAdvancedSourcelookup();
+  }
 
   public void launch(ILaunchConfiguration configuration, String mode, ILaunch launch, IProgressMonitor monitor)
       throws CoreException {
@@ -291,12 +294,12 @@ public class MavenLaunchDelegate extends JavaLaunchDelegate implements MavenLaun
     File jvmConfig = new File(mvnDir, "jvm.config");
     if(jvmConfig.isFile()) {
       try {
-        for(String line : Files.readLines(jvmConfig, Charsets.UTF_8)) {
+        for(String line : Files.readAllLines(jvmConfig.toPath(), StandardCharsets.UTF_8)) {
           arguments.append(line);
         }
       } catch(IOException ex) {
-        IStatus error = new Status(IStatus.ERROR, IMavenConstants.PLUGIN_ID, NLS.bind(
-            Messages.MavenLaunchDelegate_error_cannot_read_jvmConfig, jvmConfig.getAbsolutePath()), ex);
+        IStatus error = new Status(IStatus.ERROR, IMavenConstants.PLUGIN_ID,
+            NLS.bind(Messages.MavenLaunchDelegate_error_cannot_read_jvmConfig, jvmConfig.getAbsolutePath()), ex);
         throw new CoreException(error);
       }
     }
