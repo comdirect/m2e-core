@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Copyright (c) 2010-2015 Sonatype, Inc, and others.
+  Copyright (c) 2010, 2019 Sonatype, Inc, and others.
   All rights reserved. This program and the accompanying materials
   are made available under the terms of the Eclipse Public License v1.0
   which accompanies this distribution, and is available at
@@ -9,11 +9,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
-  <prerequisites>
-    <maven>3.0</maven>
-  </prerequisites>
-
   <parent>
     <groupId>org.sonatype.forge</groupId>
     <artifactId>forge-parent</artifactId>
@@ -23,7 +18,7 @@
 
   <groupId>org.eclipse.m2e</groupId>
   <artifactId>m2e-core</artifactId>
-  <version>1.10.0-SNAPSHOT</version>
+  <version>1.12.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Maven Integration for Eclipse (parent)</name>
@@ -37,16 +32,17 @@
 
     <m2e-maven-runtime.version>${project.version}</m2e-maven-runtime.version>
 
-    <tycho-version>1.2.0</tycho-version>
+    <tycho-version>1.4.0</tycho-version>
     <tycho-extras-version>${tycho-version}</tycho-extras-version>
 
     <!-- eclipse version m2e is built against -->
-    <eclipse.stream>photon</eclipse.stream>
-    <eclipse-repo.url>http://download.eclipse.org/eclipse/updates/4.8/</eclipse-repo.url>
+    <eclipse.stream>2019-03</eclipse.stream>
+    <eclipse-repo.url>http://download.eclipse.org/eclipse/updates/4.11/</eclipse-repo.url>
     <eclipse-simrel.url>http://download.eclipse.org/releases/${eclipse.stream}</eclipse-simrel.url>
 
-    <tycho.test.jvmArgs>-Xmx800m</tycho.test.jvmArgs>
+    <tycho.testArgLine>-Xmx800m</tycho.testArgLine>
     <tycho.surefire.timeout>7200</tycho.surefire.timeout>
+    <jacoco.destFile>../target/jacoco.exec</jacoco.destFile>
   </properties>
 
   <organization>
@@ -81,6 +77,11 @@
       <id>eclipse-license</id>
       <layout>p2</layout>
       <url>http://download.eclipse.org/cbi/updates/license</url>
+    </repository>
+    <repository>
+      <id>Orbit 2019-06 M3</id>
+      <layout>p2</layout>
+      <url>https://download.eclipse.org/tools/orbit/downloads/drops/S20190521195709/repository/</url>
     </repository>
   </repositories>
 
@@ -131,6 +132,7 @@
     <module>org.eclipse.m2e.site</module>
 
     <!-- testing -->
+    <module>org.eclipse.m2e.core.tests</module>
     <module>org.eclipse.m2e.importer.tests</module>
     <module>org.eclipse.m2e.binaryproject.tests</module>
   </modules>
@@ -176,7 +178,6 @@
       <plugin>
         <groupId>org.eclipse.tycho</groupId>
         <artifactId>target-platform-configuration</artifactId>
-        <version>${tycho-version}</version>
         <configuration>
           <pomDependencies>consider</pomDependencies>
         </configuration>
@@ -193,6 +194,24 @@
             </goals>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.4</version>
+        <executions>
+          <execution>
+            <goals><goal>prepare-agent</goal></goals>
+          </execution>
+        </executions>
+        <configuration>
+          <append>true</append>
+          <includes>
+            <include>org.eclipse.m2e*</include>
+            <include>org.apache.maven*</include>
+            <include>org.eclipse.aether*</include>
+          </includes>
+        </configuration>
       </plugin>
     </plugins>
 
@@ -215,7 +234,6 @@
             <includes>
               <include>**/*Test.java</include>
             </includes>
-            <argLine>${tycho.test.jvmArgs}</argLine>
             <forkedProcessTimeoutInSeconds>${tycho.surefire.timeout}</forkedProcessTimeoutInSeconds>
           </configuration>
         </plugin>
@@ -223,6 +241,31 @@
           <groupId>org.eclipse.tycho</groupId>
           <artifactId>tycho-p2-plugin</artifactId>
           <version>${tycho-version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>target-platform-configuration</artifactId>
+          <version>${tycho-version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>tycho-compiler-plugin</artifactId>
+          <version>${tycho-version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>tycho-p2-publisher-plugin</artifactId>
+          <version>${tycho-version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>tycho-p2-repository-plugin</artifactId>
+          <version>${tycho-version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.sonarsource.scanner.maven</groupId>
+          <artifactId>sonar-maven-plugin</artifactId>
+          <version>${sonar-maven-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -342,7 +385,7 @@
         </os>
       </activation>
       <properties>
-        <tycho.test.jvmArgs>-Xmx800m -Dosgi.ws=cocoa -XstartOnFirstThread</tycho.test.jvmArgs>
+        <tycho.testArgLine>-Xmx800m -Dosgi.ws=cocoa -XstartOnFirstThread</tycho.testArgLine>
       </properties>
       <build>
         <pluginManagement>
@@ -369,6 +412,18 @@
           </plugins>
         </pluginManagement>
       </build>
+    </profile>
+    <profile>
+      <id>uts</id>
+      <modules>
+        <module>m2e-core-tests</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>its</id>
+      <modules>
+        <module>m2e-core-tests</module>
+      </modules>
     </profile>
   </profiles>
 

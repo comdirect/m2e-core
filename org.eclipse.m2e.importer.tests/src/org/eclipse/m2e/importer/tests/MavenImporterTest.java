@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016 Red Hat Inc.
+ * Copyright (c) 2016, 2019 Red Hat Inc.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -28,7 +28,6 @@ import org.apache.commons.io.FileUtils;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.ui.internal.wizards.datatransfer.SmartImportJob;
 import org.eclipse.ui.wizards.datatransfer.ProjectConfigurator;
 
@@ -36,8 +35,6 @@ import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.project.IMavenProjectFacade;
 import org.eclipse.m2e.importer.internal.MavenProjectConfigurator;
 import org.eclipse.m2e.tests.common.AbstractMavenProjectTestCase;
-import org.eclipse.m2e.tests.common.JobHelpers;
-import org.eclipse.m2e.tests.common.JobHelpers.IJobMatcher;
 
 
 public class MavenImporterTest extends AbstractMavenProjectTestCase {
@@ -65,17 +62,17 @@ public class MavenImporterTest extends AbstractMavenProjectTestCase {
   @Test
   public void test() throws Exception {
     Set<IProject> newProjects = null;
-    SmartImportJob job = new SmartImportJob(projectDirectory, Collections.EMPTY_SET, true, true);
+    SmartImportJob job = new SmartImportJob(projectDirectory, Collections.emptySet(), true, true);
 
     Map<File, List<ProjectConfigurator>> proposals = job.getImportProposals(monitor);
     Assert.assertEquals("Expected 2 projects to import", 2, proposals.size()); //$NON-NLS-1$
-    boolean thymConfiguratorFound = false;
+    boolean mavenConfiguratorFound = false;
     for(ProjectConfigurator configurator : proposals.values().iterator().next()) {
       if(configurator instanceof MavenProjectConfigurator) {
-        thymConfiguratorFound = true;
+        mavenConfiguratorFound = true;
       }
     }
-    Assert.assertTrue("Maven configurator not found while checking directory", thymConfiguratorFound); //$NON-NLS-1$
+    Assert.assertTrue("Maven configurator not found while checking directory", mavenConfiguratorFound); //$NON-NLS-1$
 
     // accept proposals
     job.setDirectoriesToImport(proposals.keySet());
@@ -87,16 +84,11 @@ public class MavenImporterTest extends AbstractMavenProjectTestCase {
     newProjects = new HashSet<>(Arrays.asList(wsRoot.getProjects()));
     newProjects.removeAll(beforeImport);
     Assert.assertEquals("Expected only 2 new projects", 2, newProjects.size()); //$NON-NLS-1$
-
-    JobHelpers.waitForJobs(new IJobMatcher() {
-      public boolean matches(Job job) {
-        return MavenProjectConfigurator.UPDATE_MAVEN_CONFIGURATION_JOB_NAME.equals(job.getName());
-      }
-    }, 30_000);
-
     for(IProject project : newProjects) {
       Assert.assertTrue(
           project.getLocation().toFile().getCanonicalPath().startsWith(projectDirectory.getCanonicalPath()));
+      refreshMavenProject(project);
+      waitForJobsToComplete();
       IMavenProjectFacade mavenProject = MavenPlugin.getMavenProjectRegistry().getProject(project);
       Assert.assertNotNull("Project not configured as Maven", mavenProject); //$NON-NLS-1$
     }
@@ -106,17 +98,17 @@ public class MavenImporterTest extends AbstractMavenProjectTestCase {
   public void testRootWithoutPom() throws Exception {
     Set<IProject> newProjects = null;
     // important part here is the "getParentFile()"
-    SmartImportJob job = new SmartImportJob(projectDirectory.getParentFile(), Collections.EMPTY_SET, true, true);
+    SmartImportJob job = new SmartImportJob(projectDirectory.getParentFile(), Collections.emptySet(), true, true);
 
     Map<File, List<ProjectConfigurator>> proposals = job.getImportProposals(monitor);
     Assert.assertEquals("Expected 2 projects to import", 2, proposals.size()); //$NON-NLS-1$
-    boolean thymConfiguratorFound = false;
+    boolean mavenConfiguratorFound = false;
     for(ProjectConfigurator configurator : proposals.values().iterator().next()) {
       if(configurator instanceof MavenProjectConfigurator) {
-        thymConfiguratorFound = true;
+        mavenConfiguratorFound = true;
       }
     }
-    Assert.assertTrue("Maven configurator not found while checking directory", thymConfiguratorFound); //$NON-NLS-1$
+    Assert.assertTrue("Maven configurator not found while checking directory", mavenConfiguratorFound); //$NON-NLS-1$
 
     // accept proposals
     job.setDirectoriesToImport(proposals.keySet());
@@ -128,16 +120,11 @@ public class MavenImporterTest extends AbstractMavenProjectTestCase {
     newProjects = new HashSet<>(Arrays.asList(wsRoot.getProjects()));
     newProjects.removeAll(beforeImport);
     Assert.assertEquals("Expected only 2 new projects", 2, newProjects.size()); //$NON-NLS-1$
-
-    JobHelpers.waitForJobs(new IJobMatcher() {
-      public boolean matches(Job job) {
-        return MavenProjectConfigurator.UPDATE_MAVEN_CONFIGURATION_JOB_NAME.equals(job.getName());
-      }
-    }, 30_000);
-
     for(IProject project : newProjects) {
       Assert.assertTrue(
           project.getLocation().toFile().getCanonicalPath().startsWith(projectDirectory.getCanonicalPath()));
+      refreshMavenProject(project);
+      waitForJobsToComplete();
       IMavenProjectFacade mavenProject = MavenPlugin.getMavenProjectRegistry().getProject(project);
       Assert.assertNotNull("Project not configured as Maven", mavenProject); //$NON-NLS-1$
     }

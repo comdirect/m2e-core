@@ -16,7 +16,7 @@ Contributors:
   <parent>
     <groupId>org.eclipse.m2e</groupId>
     <artifactId>m2e-core</artifactId>
-    <version>1.10.0-SNAPSHOT</version>
+    <version>1.12.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.m2e.importer.tests</artifactId>
@@ -25,18 +25,15 @@ Contributors:
   <name>Tests for Maven Integration for Eclipse Importer framework</name>
 
   <build>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>org.eclipse.tycho</groupId>
-          <artifactId>tycho-surefire-plugin</artifactId>
-          <version>${tycho-version}</version>
-          <configuration>
-            <useUIHarness>true</useUIHarness>
-            <useUIThread>false</useUIThread>
-          </configuration>
-        </plugin>
-      </plugins>
-    </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>org.eclipse.tycho</groupId>
+        <artifactId>tycho-surefire-plugin</artifactId>
+        <configuration>
+          <useUIHarness>true</useUIHarness>
+          <useUIThread>false</useUIThread>
+        </configuration>
+      </plugin>
+    </plugins>
   </build>
 </project>
