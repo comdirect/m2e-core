@@ -12,7 +12,7 @@
 
 package org.eclipse.m2e.importview.views;
 
-import java.util.Iterator;
+import java.util.regex.Pattern;
 
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerFilter;
@@ -20,45 +20,52 @@ import org.eclipse.m2e.core.project.MavenProjectInfo;
 
 /**
  * Filters Maven Project Info by contained text
- * 
+ *
  * @author Nikolaus Winter, comdirect bank AG
  */
 final class MavenProjectInfoFilter extends ViewerFilter {
 
-   private final String filterText;
+	private final Pattern filterPattern;
 
-   MavenProjectInfoFilter(String filterText) {
-      this.filterText = filterText;
-   }
+	MavenProjectInfoFilter(String filterText) {
+		this.filterPattern = createPatternFromInput(filterText);
+	}
 
-   @Override
-   public boolean select(Viewer viewer, Object parentElement, Object element) {
-      if (!(element instanceof MavenProjectInfo)) {
-         return false;
-      }
-      MavenProjectInfo mavenProjectInfo = (MavenProjectInfo) element;
-      return select(mavenProjectInfo);
-   }
+	@Override
+	public boolean select(Viewer viewer, Object parentElement, Object element) {
+		if (!(element instanceof MavenProjectInfo)) {
+			return false;
+		}
 
-   private boolean select(MavenProjectInfo mavenProjectInfo) {
+		MavenProjectInfo mavenProjectInfo = (MavenProjectInfo) element;
+		return select(mavenProjectInfo);
+	}
 
-      // leaf
-      if (mavenProjectInfo.getProjects().isEmpty()) {
-         return mavenProjectInfo.getModel().getArtifactId().contains(filterText);
-      }
+	private Pattern createPatternFromInput(String filterText) {
+		filterText = "\\Q" + filterText + "\\E";
+		filterText = replaceEscaped(filterText, "*", ".*");
+		filterText = replaceEscaped(filterText, "?", ".");
 
-      // node matching by name
-      if (mavenProjectInfo.getModel().getArtifactId().contains(filterText)) {
-         return true;
-      }
+		return Pattern.compile(filterText, Pattern.CASE_INSENSITIVE);
+	}
 
-      // non-matching node with children
-      Iterator<MavenProjectInfo> iterator = mavenProjectInfo.getProjects().iterator();
-      boolean matchingChildFound = false;
-      while (!matchingChildFound && iterator.hasNext()) {
-         matchingChildFound = select(iterator.next());
-      }
-      return matchingChildFound;
-   }
+	private boolean select(MavenProjectInfo mavenProjectInfo) {
+		if (mavenProjectInfo.getProjects().isEmpty()) {
+			return artifactMatches(mavenProjectInfo.getModel().getArtifactId());
+		}
 
+		if (artifactMatches(mavenProjectInfo.getModel().getArtifactId())) {
+			return true;
+		}
+
+		return mavenProjectInfo.getProjects().stream().anyMatch(this::select);
+	}
+
+	private boolean artifactMatches(String artifactId) {
+		return filterPattern.matcher(artifactId).find();
+	}
+
+	private String replaceEscaped(String input, String substring, String replacement) {
+		return input.replace(substring, "\\E" + replacement + "\\Q");
+	}
 }
