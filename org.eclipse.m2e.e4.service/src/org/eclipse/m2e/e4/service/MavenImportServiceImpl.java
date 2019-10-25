@@ -37,61 +37,61 @@ import org.eclipse.ui.IWorkingSet;
 @SuppressWarnings("restriction")
 public class MavenImportServiceImpl implements MavenImportService {
 
-   private MavenModelManager modelManager;
+	private MavenModelManager modelManager;
 
-   @Override
-   public void importProject(File projectFolder, boolean cleanEclipseFiles) {
+	@Override
+	public void importProject(File projectFolder, boolean cleanEclipseFiles) {
+		MavenProjectInfo projectInfo = null;
 
-      MavenProjectInfo projectInfo = null;
+		try {
+			File pomFile = new File(projectFolder, IMavenConstants.POM_FILE_NAME);
+			Model mavenModel = this.modelManager.readMavenModel(pomFile);
+			projectInfo = new MavenProjectInfo(mavenModel.getArtifactId(), pomFile, mavenModel, null);
+		} catch (CoreException e) {
+			MavenE4ServicePlugin.getDefault().log(IStatus.ERROR, "Error", e);
+		}
 
-      try {
-         File pomFile = new File(projectFolder, IMavenConstants.POM_FILE_NAME);
-         Model mavenModel = this.modelManager.readMavenModel(pomFile);
-         projectInfo = new MavenProjectInfo(mavenModel.getArtifactId(), pomFile, mavenModel, null);
-      } catch (CoreException e) {
-         MavenE4ServicePlugin.getDefault().log(IStatus.ERROR, "Error", e);
-      }
+		Collection<MavenProjectInfo> mavenProjectsToImport = new ArrayList<>(1);
+		mavenProjectsToImport.add(projectInfo);
 
-      Collection<MavenProjectInfo> mavenProjectsToImport = new ArrayList<>(1);
-      mavenProjectsToImport.add(projectInfo);
+		if (cleanEclipseFiles) {
+			removeEclipseFiles(projectFolder);
+		}
 
-      if (cleanEclipseFiles) {
-         removeEclipseFiles(projectFolder);
-      }
+		ImportMavenProjectsJob job = new ImportMavenProjectsJob(mavenProjectsToImport, new ArrayList<IWorkingSet>(),
+				new ProjectImportConfiguration());
+		job.setRule(MavenPlugin.getProjectConfigurationManager().getRule());
+		job.schedule();
+	}
 
-      ImportMavenProjectsJob job = new ImportMavenProjectsJob(mavenProjectsToImport, new ArrayList<IWorkingSet>(), new ProjectImportConfiguration());
-      job.setRule(MavenPlugin.getProjectConfigurationManager().getRule());
-      job.schedule();
-   }
+	/**
+	 * Removes Eclipse-Files from given Project Folder.
+	 *
+	 * @param projectFolder Project Folder
+	 */
+	private void removeEclipseFiles(File projectFolder) {
+		new File(projectFolder, ".project").delete();
+		new File(projectFolder, ".classpath").delete();
+		new File(projectFolder, ".factorypath").delete();
+		File settingsDirectory = new File(projectFolder, ".settings");
+		if (settingsDirectory.isDirectory()) {
+			File[] settingsFiles = settingsDirectory.listFiles();
+			for (File settingsFile : settingsFiles) {
+				settingsFile.delete();
+			}
+			settingsDirectory.delete();
+		}
+	}
 
-   /**
-    * Removes Eclipse-Files from given Project Folder.
-    * 
-    * @param projectFolder Project Folder
-    */
-   private void removeEclipseFiles(File projectFolder) {
-      new File(projectFolder, ".project").delete();
-      new File(projectFolder, ".classpath").delete();
-      new File(projectFolder, ".factorypath").delete();
-      File settingsDirectory = new File(projectFolder, ".settings");
-      if (settingsDirectory.isDirectory()) {
-         File[] settingsFiles = settingsDirectory.listFiles();
-         for (int i = 0; i < settingsFiles.length; i++) {
-            settingsFiles[i].delete();
-         }
-         settingsDirectory.delete();
-      }
-   }
-
-   /**
-    * Registers MavenImportService at {@link IEclipseContext} (E4).
-    * 
-    * @param context {@link IEclipseContext} (E4)
-    */
-   @Inject
-   public void setEclipseContext(IEclipseContext context) {
-      context.set(MavenImportService.class, this);
-      this.modelManager = MavenPlugin.getMavenModelManager();
-      MavenE4ServicePlugin.getDefault().log(IStatus.INFO, "Registered MavenImportService");
-   }
+	/**
+	 * Registers MavenImportService at {@link IEclipseContext} (E4).
+	 *
+	 * @param context {@link IEclipseContext} (E4)
+	 */
+	@Inject
+	public void setEclipseContext(IEclipseContext context) {
+		context.set(MavenImportService.class, this);
+		this.modelManager = MavenPlugin.getMavenModelManager();
+		MavenE4ServicePlugin.getDefault().log(IStatus.INFO, "Registered MavenImportService");
+	}
 }

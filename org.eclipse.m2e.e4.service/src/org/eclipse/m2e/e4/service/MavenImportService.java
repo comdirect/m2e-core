@@ -13,20 +13,18 @@ package org.eclipse.m2e.e4.service;
 
 import java.io.File;
 
-
 /**
  * MavenImportService
  *
  * @author Nikolaus Winter, comdirect bank AG
  */
 public interface MavenImportService {
-
-  /**
-   * Imports Maven Project to Workspace. If desired, this methods cleans the Eclipse files prior to import.
-   * 
-   * @param projectFolder Folder where Maven Project is located.
-   * @param cleanEclipseFiles Should the Eclipse files be cleaned prior to import?
-   */
-  public void importProject(File projectFolder, boolean cleanEclipseFiles);
-
+	/**
+	 * Imports Maven Project to Workspace. If desired, this methods cleans the
+	 * Eclipse files prior to import.
+	 *
+	 * @param projectFolder     Folder where Maven Project is located.
+	 * @param cleanEclipseFiles Should the Eclipse files be cleaned prior to import?
+	 */
+	public void importProject(File projectFolder, boolean cleanEclipseFiles);
 }

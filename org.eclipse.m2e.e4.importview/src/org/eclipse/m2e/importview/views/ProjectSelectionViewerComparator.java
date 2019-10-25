@@ -17,14 +17,14 @@ import org.eclipse.m2e.core.project.MavenProjectInfo;
 
 /**
  * Compares two {@link MavenProjectInfo} objects for ordering in lists.
- * 
+ *
  * @author Nikolaus Winter, comdirect bank AG
  */
 final class ProjectSelectionViewerComparator extends ViewerComparator {
-   @Override
-   public int compare(Viewer viewer, Object e1, Object e2) {
-      MavenProjectInfo info1 = (MavenProjectInfo) e1;
-      MavenProjectInfo info2 = (MavenProjectInfo) e2;
-      return info1.getModel().getArtifactId().compareTo(info2.getModel().getArtifactId());
-   }
+	@Override
+	public int compare(Viewer viewer, Object e1, Object e2) {
+		MavenProjectInfo info1 = (MavenProjectInfo) e1;
+		MavenProjectInfo info2 = (MavenProjectInfo) e2;
+		return info1.getModel().getArtifactId().compareTo(info2.getModel().getArtifactId());
+	}
 }

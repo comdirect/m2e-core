@@ -14,30 +14,20 @@ package org.eclipse.m2e.importview.views;
 
 import org.eclipse.jface.viewers.LabelProvider;
 import org.eclipse.m2e.core.project.MavenProjectInfo;
-import org.eclipse.swt.graphics.Image;
 
 /**
  * Provides Labels for Tree View to select projects.
- * 
+ *
  * @author Nikolaus Winter, comdirect bank AG
  */
 final class ProjectSelectionLabelProvider extends LabelProvider {
 
-   @Override
-   public String getText(Object element) {
-      // TODO: formatted text (highlighting of differentiation)
-      if (!(element instanceof MavenProjectInfo)) {
-         return "unknown";
-      }
-      return ((MavenProjectInfo) element).getModel().getArtifactId();
-   }
-
-   @Override
-   public Image getImage(Object element) {
-      if (!(element instanceof MavenProjectInfo)) {
-         return null;
-      }
-      // FIXME: implement
-      return null;
-   }
+	@Override
+	public String getText(Object element) {
+		// TODO: formatted text (highlighting of differentiation)
+		if (!(element instanceof MavenProjectInfo)) {
+			return "unknown";
+		}
+		return ((MavenProjectInfo) element).getModel().getArtifactId();
+	}
 }
