@@ -23,6 +23,7 @@ public class Messages extends NLS {
 
 	public static String labelRootDirectory;
 	public static String buttonBrowseRootDirectory;
+	public static String buttonRemoveRootDirectory;
 	public static String labelFilterProjects;
 	public static String labelProjectTreeViewer;
 	public static String labelProjectImportList;
@@ -36,6 +37,7 @@ public class Messages extends NLS {
 	public static String selectRootDirectoryMessageNoProjectsFoundText;
 
 	public static String buttonReloadTooltip;
+	public static String buttonRemoveRootDirectoryTooltip;
 	public static String buttonCollapseToLevel1Tooltip;
 	public static String buttonExpandAllTooltip;
 	public static String buttonAddAllTooltip;

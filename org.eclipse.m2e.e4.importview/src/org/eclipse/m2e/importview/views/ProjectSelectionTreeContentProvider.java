@@ -75,6 +75,5 @@ final class ProjectSelectionTreeContentProvider implements ITreeContentProvider 
 
 	@Override
 	public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
-		// TODO: why is this not necessary?
 	}
 }

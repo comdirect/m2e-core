@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringTokenizer;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.model.Model;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.IStatus;
@@ -97,8 +98,10 @@ public class ProjectImportView extends ViewPart {
 	}
 
 	private void createLeftPanel(final Composite parent) {
+		final int totalWidth = 7;
+
 		Composite left = new Composite(parent, SWT.NONE);
-		left.setLayout(new GridLayout(6, false));
+		left.setLayout(new GridLayout(totalWidth, false));
 		GridData leftCompositeLayoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
 		left.setLayoutData(leftCompositeLayoutData);
 
@@ -119,6 +122,12 @@ public class ProjectImportView extends ViewPart {
 		browseButton.setText(Messages.buttonBrowseRootDirectory);
 		browseButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false));
 		browseButton.addSelectionListener(new BrowseForDirectoryHandler(parent));
+
+		final Button removeRootDirectoryButton = new Button(left, SWT.NONE);
+		removeRootDirectoryButton.setText(Messages.buttonRemoveRootDirectory);
+		removeRootDirectoryButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false));
+		removeRootDirectoryButton.setToolTipText(Messages.buttonRemoveRootDirectoryTooltip);
+		removeRootDirectoryButton.addSelectionListener(new RemoveRootDirectoryHandler());
 
 		final Button reloadButton = new Button(left, SWT.NONE);
 		reloadButton.setImage(
@@ -146,7 +155,7 @@ public class ProjectImportView extends ViewPart {
 		filterLabel.setText(Messages.labelFilterProjects);
 
 		filterText = new Text(left, SWT.BORDER + SWT.SEARCH + SWT.ICON_CANCEL);
-		filterText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 5, 1));
+		filterText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, totalWidth - 1, 1));
 		filterText.addModifyListener(new FilterChangedHandler());
 
 		final Label projectsLabel = new Label(left, SWT.NONE);
@@ -160,13 +169,15 @@ public class ProjectImportView extends ViewPart {
 		projectTreeViewer.addDoubleClickListener(new SelectProjectByDoubleClickHandler());
 
 		final Tree projectTree = projectTreeViewer.getTree();
-		GridData projectTreeData = new GridData(SWT.FILL, SWT.FILL, true, true, 5, 1);
+		GridData projectTreeData = new GridData(SWT.FILL, SWT.FILL, true, true, totalWidth - 1, 1);
 		projectTree.setLayoutData(projectTreeData);
 	}
 
 	private void createCenterPanel(final Composite parent) {
+		final int totalWidth = 1;
+
 		Composite center = new Composite(parent, SWT.NONE);
-		center.setLayout(new GridLayout(1, false));
+		center.setLayout(new GridLayout(totalWidth, false));
 
 		final Button addAllButton = new Button(center, SWT.NONE);
 		addAllButton.setImage(
@@ -184,13 +195,15 @@ public class ProjectImportView extends ViewPart {
 	}
 
 	private void createRightPanel(final Composite parent) {
+		final int totalWidth = 4;
+
 		Composite right = new Composite(parent, SWT.NONE);
-		right.setLayout(new GridLayout(4, false));
+		right.setLayout(new GridLayout(totalWidth, false));
 		GridData rightCompositeLayoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
 		right.setLayoutData(rightCompositeLayoutData);
 
 		final Label projectImportLabel = new Label(right, SWT.NONE);
-		projectImportLabel.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 4, 1));
+		projectImportLabel.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, totalWidth, 1));
 		projectImportLabel.setText(Messages.labelProjectImportList);
 
 		projectImportListViewer = new ListViewer(right, SWT.BORDER | SWT.MULTI | SWT.V_SCROLL);
@@ -201,7 +214,7 @@ public class ProjectImportView extends ViewPart {
 		projectImportListViewer.addDoubleClickListener(new DeselectProjectByDoubleClickHandler());
 
 		final org.eclipse.swt.widgets.List projectList = projectImportListViewer.getList();
-		GridData projectListData = new GridData(SWT.FILL, SWT.FILL, true, true, 4, 1);
+		GridData projectListData = new GridData(SWT.FILL, SWT.FILL, true, true, totalWidth, 1);
 		projectList.setLayoutData(projectListData);
 
 		final Button clearProjectListButton = new Button(right, SWT.NONE);
@@ -230,7 +243,7 @@ public class ProjectImportView extends ViewPart {
 
 		removeEclipseFilesCheckbox = new Button(right, SWT.CHECK);
 		removeEclipseFilesCheckbox.setText(Messages.labelRemoveEclipseFiles);
-		removeEclipseFilesCheckbox.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 6, 1));
+		removeEclipseFilesCheckbox.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, totalWidth, 1));
 		// FIXME: remember last state
 		removeEclipseFilesCheckbox.setSelection(true);
 	}
@@ -238,6 +251,14 @@ public class ProjectImportView extends ViewPart {
 	@Override
 	public void setFocus() {
 		rootDirectoryCombo.setFocus();
+	}
+
+	private void reloadProjectSelectionList() {
+		if (!StringUtils.isEmpty(rootDirectory)) {
+			loadProjectSelectionList(rootDirectory);
+		} else {
+			projectTreeViewer.setInput(null);
+		}
 	}
 
 	/**
@@ -249,8 +270,7 @@ public class ProjectImportView extends ViewPart {
 	 * @return Has a non-empty project list been loaded?
 	 */
 	private boolean loadProjectSelectionList(String location) {
-
-		if (location == null || location.length() == 0) {
+		if (StringUtils.isEmpty(location)) {
 			return false;
 		}
 
@@ -378,6 +398,23 @@ public class ProjectImportView extends ViewPart {
 	}
 
 	/**
+	 * Handles Event "Remove Root Directory"
+	 */
+	private final class RemoveRootDirectoryHandler extends SelectionAdapter {
+		@Override
+		public void widgetSelected(SelectionEvent e) {
+			int selection = rootDirectoryCombo.getSelectionIndex();
+			if (selection >= 0) {
+				rootDirectoryCombo.remove(selection);
+			}
+			rootDirectoryCombo.select(0);
+
+			rootDirectory = rootDirectoryCombo.getText();
+			reloadProjectSelectionList();
+		}
+	}
+
+	/**
 	 * Handles Event "Reload"
 	 *
 	 * @author Nikolaus Winter, comdirect bank AG
@@ -385,14 +422,7 @@ public class ProjectImportView extends ViewPart {
 	private final class ReloadRepoHandler extends SelectionAdapter {
 		@Override
 		public void widgetSelected(SelectionEvent e) {
-			String rootDirectory = ProjectImportView.this.rootDirectory;
-			if (rootDirectory != null) {
-				boolean nonEmptyListLoaded = loadProjectSelectionList(rootDirectory);
-				if (!nonEmptyListLoaded) {
-					// TODO: inform user (msg)
-					return;
-				}
-			}
+			reloadProjectSelectionList();
 		}
 	}
 
