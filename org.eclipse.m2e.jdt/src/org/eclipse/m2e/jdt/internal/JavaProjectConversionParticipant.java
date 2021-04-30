@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2012 Red Hat, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Red Hat, Inc. - initial API and implementation
@@ -82,7 +84,7 @@ public class JavaProjectConversionParticipant extends AbstractProjectConversionP
 
   private static final String COMPILER_ARTIFACT_ID = "maven-compiler-plugin"; //$NON-NLS-1$
 
-  private static final String DEFAULT_COMPILER_VERSION = "3.8.0"; //$NON-NLS-1$
+  private static final String DEFAULT_COMPILER_VERSION = "3.8.1"; //$NON-NLS-1$
 
   private static final String TARGET_KEY = "target"; //$NON-NLS-1$
 

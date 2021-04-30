@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -72,7 +74,7 @@ public class SaveDirtyFilesDialog extends ListDialog {
   }
 
   private static IEditorPart[] getDirtyEditors(String mask) {
-    List<IEditorPart> result = new ArrayList<IEditorPart>(0);
+    List<IEditorPart> result = new ArrayList<>(0);
     IWorkbench workbench = PlatformUI.getWorkbench();
     IWorkbenchWindow[] windows = workbench.getWorkbenchWindows();
     for(int i = 0; i < windows.length; i++ ) {
@@ -99,6 +101,7 @@ public class SaveDirtyFilesDialog extends ListDialog {
     setContentProvider(new ListContentProvider());
   }
 
+  @Override
   protected Control createDialogArea(Composite container) {
     Composite result = (Composite) super.createDialogArea(container);
     // TODO... provide preference that supports 'always save'
@@ -107,10 +110,12 @@ public class SaveDirtyFilesDialog extends ListDialog {
 
   private ILabelProvider createDialogLabelProvider() {
     return new LabelProvider() {
+      @Override
       public Image getImage(Object element) {
         return ((IEditorPart) element).getTitleImage();
       }
 
+      @Override
       public String getText(Object element) {
         return ((IEditorPart) element).getTitle();
       }
@@ -126,12 +131,14 @@ public class SaveDirtyFilesDialog extends ListDialog {
   static class ListContentProvider implements IStructuredContentProvider {
     List fContents;
 
+    @Override
     public Object[] getElements(Object input) {
       if(fContents != null && fContents == input)
         return fContents.toArray();
       return new Object[0];
     }
 
+    @Override
     public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
       if(newInput instanceof List) {
         fContents = (List) newInput;
@@ -141,6 +148,7 @@ public class SaveDirtyFilesDialog extends ListDialog {
       }
     }
 
+    @Override
     public void dispose() {
     }
 

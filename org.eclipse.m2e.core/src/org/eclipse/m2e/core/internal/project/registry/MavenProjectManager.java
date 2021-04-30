@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -22,7 +24,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.apache.maven.execution.MavenExecutionRequest;
 
 import org.eclipse.m2e.core.embedder.ICallable;
-import org.eclipse.m2e.core.embedder.IMavenExecutionContext;
 import org.eclipse.m2e.core.internal.embedder.MavenExecutionContext;
 import org.eclipse.m2e.core.project.IMavenProjectChangedListener;
 import org.eclipse.m2e.core.project.IMavenProjectFacade;
@@ -119,10 +120,6 @@ public class MavenProjectManager implements IMavenProjectRegistry {
   public <V> V execute(final IMavenProjectFacade facade, final ICallable<V> callable, IProgressMonitor monitor)
       throws CoreException {
     MavenExecutionContext context = manager.createExecutionContext(facade.getPom(), facade.getResolverConfiguration());
-    return context.execute(new ICallable<V>() {
-      public V call(IMavenExecutionContext context, IProgressMonitor monitor) throws CoreException {
-        return context.execute(facade.getMavenProject(monitor), callable, monitor);
-      }
-    }, monitor);
+    return context.execute((context1, monitor1) -> context1.execute(facade.getMavenProject(monitor1), callable, monitor1), monitor);
   }
 }

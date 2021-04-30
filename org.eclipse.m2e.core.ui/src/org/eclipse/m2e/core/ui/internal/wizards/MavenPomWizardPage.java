@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2013 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -21,7 +23,6 @@ import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.window.Window;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -65,11 +66,7 @@ public class MavenPomWizardPage extends AbstractMavenWizardPage {
     Composite container = new Composite(parent, SWT.NULL);
     container.setLayout(layout);
 
-    ModifyListener modifyingListener = new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        dialogChanged();
-      }
-    };
+    ModifyListener modifyingListener = e -> dialogChanged();
 
     Label label = new Label(container, SWT.NULL);
     label.setText(Messages.MavenPomWizardPage_lblProject);

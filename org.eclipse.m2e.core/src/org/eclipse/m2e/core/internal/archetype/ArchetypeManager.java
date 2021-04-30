@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -40,9 +42,7 @@ import org.apache.maven.archetype.source.ArchetypeDataSource;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 
 import org.eclipse.m2e.core.MavenPlugin;
-import org.eclipse.m2e.core.embedder.ICallable;
 import org.eclipse.m2e.core.embedder.IMaven;
-import org.eclipse.m2e.core.embedder.IMavenExecutionContext;
 import org.eclipse.m2e.core.internal.NoSuchComponentException;
 
 
@@ -178,21 +178,19 @@ public class ArchetypeManager {
     }
 
     try {
-      return maven.execute(new ICallable<List<?>>() {
-        public List<?> call(IMavenExecutionContext context, IProgressMonitor monitor) {
-          ArtifactRepository localRepository = context.getLocalRepository();
-          if(aaMgr.isFileSetArchetype(groupId, artifactId, version, null, localRepository, repositories)) {
-            ArchetypeDescriptor descriptor;
-            try {
-              descriptor = aaMgr.getFileSetArchetypeDescriptor(groupId, artifactId, version, null, localRepository,
-                  repositories);
-            } catch(UnknownArchetype ex) {
-              throw new WrappedUnknownArchetype(ex);
-            }
-            return descriptor.getRequiredProperties();
+      return maven.execute((context, monitor1) -> {
+        ArtifactRepository localRepository = context.getLocalRepository();
+        if(aaMgr.isFileSetArchetype(groupId, artifactId, version, null, localRepository, repositories)) {
+          ArchetypeDescriptor descriptor;
+          try {
+            descriptor = aaMgr.getFileSetArchetypeDescriptor(groupId, artifactId, version, null, localRepository,
+                repositories);
+          } catch(UnknownArchetype ex) {
+            throw new WrappedUnknownArchetype(ex);
           }
-          return null;
+          return descriptor.getRequiredProperties();
         }
+        return null;
       }, monitor);
     } catch(WrappedUnknownArchetype e) {
       throw (UnknownArchetype) e.getCause();

@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2011 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -29,10 +31,8 @@ import org.slf4j.LoggerFactory;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.ToolBarManager;
-import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.viewers.AbstractTreeViewer;
 import org.eclipse.jface.viewers.ILabelProviderListener;
 import org.eclipse.jface.viewers.ITableLabelProvider;
@@ -44,8 +44,7 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.Clipboard;
 import org.eclipse.swt.dnd.TextTransfer;
 import org.eclipse.swt.dnd.Transfer;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -65,8 +64,6 @@ import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.project.MavenProject;
 
 import org.eclipse.m2e.core.MavenPlugin;
-import org.eclipse.m2e.core.embedder.ICallable;
-import org.eclipse.m2e.core.embedder.IMavenExecutionContext;
 import org.eclipse.m2e.core.internal.lifecyclemapping.LifecycleMappingFactory;
 import org.eclipse.m2e.core.internal.lifecyclemapping.LifecycleMappingResult;
 import org.eclipse.m2e.core.internal.lifecyclemapping.model.LifecycleMappingMetadata;
@@ -145,13 +142,10 @@ class LifecycleMappingsViewer {
     btnShowPhases.setText(Messages.LifecycleMappingPropertyPage_showLIfecyclePhases);
 
     final Button btnShowIgnored = new Button(optionsComposit, SWT.CHECK);
-    btnShowIgnored.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        showIgnoredExecutions = btnShowIgnored.getSelection();
-        updateMappingsTreeViewer();
-      }
-    });
+    btnShowIgnored.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      showIgnoredExecutions = btnShowIgnored.getSelection();
+      updateMappingsTreeViewer();
+    }));
     btnShowIgnored.setSelection(showIgnoredExecutions);
     btnShowIgnored.setText(Messages.LifecycleMappingPropertyPage_mntmShowIgnoredExecutions_text);
     final Action actExpandAll = new Action(Messages.LifecycleMappingPropertyPage_mntmExpandAll_text,
@@ -182,15 +176,12 @@ class LifecycleMappingsViewer {
     toolBarManager.add(actCollapseAll);
     toolBarManager.update(true);
 
-    btnShowPhases.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        showPhases = btnShowPhases.getSelection();
-        actExpandAll.setEnabled(showPhases);
-        actCollapseAll.setEnabled(showPhases);
-        updateMappingsTreeViewer();
-      }
-    });
+    btnShowPhases.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      showPhases = btnShowPhases.getSelection();
+      actExpandAll.setEnabled(showPhases);
+      actCollapseAll.setEnabled(showPhases);
+      updateMappingsTreeViewer();
+    }));
 
     mappingsTreeViewer = new TreeViewer(container, SWT.BORDER);
     Tree tree = mappingsTreeViewer.getTree();
@@ -311,12 +302,7 @@ class LifecycleMappingsViewer {
     actionsComposite.setLayout(new RowLayout(SWT.HORIZONTAL));
 
     Button btnCopyToClipboard = new Button(actionsComposite, SWT.NONE);
-    btnCopyToClipboard.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        copyToClipboard();
-      }
-    });
+    btnCopyToClipboard.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> copyToClipboard()));
     btnCopyToClipboard.setText(Messages.LifecycleMappingPropertyPage_copyToClipboard);
 
     mappingsTreeViewer.setInput(phases);
@@ -530,27 +516,23 @@ class LifecycleMappingsViewer {
       // TODO FIXADE find the mojo execution mapping for the workspace...How do I do this?
     } else {
       try {
-        PlatformUI.getWorkbench().getProgressService().run(false, false, new IRunnableWithProgress() {
-          public void run(final IProgressMonitor monitor) throws InvocationTargetException {
-            final IMavenProjectRegistry projectRegistry = MavenPlugin.getMavenProjectRegistry();
-            final IMavenProjectFacade facade = projectRegistry.getProject(project);
-            if(facade == null) {
-              return;
-            }
-            try {
-              projectRegistry.execute(facade, new ICallable<Void>() {
-                public Void call(IMavenExecutionContext context, IProgressMonitor monitor) throws CoreException {
-                  MavenProject mavenProject = facade.getMavenProject(monitor);
-                  List<MojoExecution> mojoExecutions = ((MavenProjectFacade) facade).getMojoExecutions(monitor);
-                  LifecycleMappingResult mappingResult = LifecycleMappingFactory.calculateLifecycleMapping(mavenProject,
-                      mojoExecutions, facade.getResolverConfiguration().getLifecycleMappingId(), monitor);
-                  mappings = mappingResult.getMojoExecutionMapping();
-                  return null;
-                }
-              }, monitor);
-            } catch(CoreException ex) {
-              throw new InvocationTargetException(ex);
-            }
+        PlatformUI.getWorkbench().getProgressService().run(false, false, monitor -> {
+          final IMavenProjectRegistry projectRegistry = MavenPlugin.getMavenProjectRegistry();
+          final IMavenProjectFacade facade = projectRegistry.getProject(project);
+          if(facade == null) {
+            return;
+          }
+          try {
+            projectRegistry.execute(facade, (context, monitor1) -> {
+              MavenProject mavenProject = facade.getMavenProject(monitor1);
+              List<MojoExecution> mojoExecutions = ((MavenProjectFacade) facade).getMojoExecutions(monitor1);
+              LifecycleMappingResult mappingResult = LifecycleMappingFactory.calculateLifecycleMapping(mavenProject,
+                  mojoExecutions, facade.getResolverConfiguration().getLifecycleMappingId(), monitor1);
+              mappings = mappingResult.getMojoExecutionMapping();
+              return null;
+            }, monitor);
+          } catch(CoreException ex) {
+            throw new InvocationTargetException(ex);
           }
         });
       } catch(InvocationTargetException ex) {

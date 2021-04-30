@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2013 Igor Fedorenko
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Igor Fedorenko - initial API and implementation
@@ -18,13 +20,8 @@ import java.util.Set;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jface.dialogs.TitleAreaDialog;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
@@ -81,22 +78,14 @@ public class AssignWorkingSetDialog extends TitleAreaDialog {
     final Button btnFilterAssignedProjects = new Button(filtersComposite, SWT.CHECK);
     btnFilterAssignedProjects.setText(Messages.AssignWorkingSetDialog_btnFilterAssignedProjects_text);
     btnFilterAssignedProjects.setSelection(true);
-    btnFilterAssignedProjects.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        selectedProjects.refresh();
-      }
-    });
+    btnFilterAssignedProjects
+        .addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> selectedProjects.refresh()));
 
     final Button btnFilterClosedProjects = new Button(filtersComposite, SWT.CHECK);
     btnFilterClosedProjects.setText(Messages.AssignWorkingSetDialog_btnFilterClosedProjects_text);
     btnFilterClosedProjects.setSelection(true);
-    btnFilterClosedProjects.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        selectedProjects.refresh();
-      }
-    });
+    btnFilterClosedProjects
+        .addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> selectedProjects.refresh()));
 
     this.selectedProjects = new NestedProjectsComposite(composite, SWT.NONE, initialSelection, false) {
       @Override
@@ -122,34 +111,26 @@ public class AssignWorkingSetDialog extends TitleAreaDialog {
     lblNewLabel.setText(Messages.AssignWorkingSetDialog_lblWorkingSet);
 
     workingSetCombo = new Combo(workingSetComposite, SWT.BORDER);
-    workingSetCombo.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        workingSetName = workingSetCombo.getText();
-      }
-    });
+    workingSetCombo.addModifyListener(e -> workingSetName = workingSetCombo.getText());
     GridData gd_workingSetName = new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1);
     gd_workingSetName.horizontalIndent = 10;
     workingSetCombo.setLayoutData(gd_workingSetName);
     workingSetCombo.setItems(WorkingSets.getWorkingSets());
 
-    selectedProjects.addSelectionChangeListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent event) {
-        IProject selection = selectedProjects.getSelection();
-        if(selection != null && workingSetCombo.getSelectionIndex() < 0) {
-          workingSetCombo.setText(selection.getName());
-        }
+    selectedProjects.addSelectionChangeListener(event -> {
+      IProject selection = selectedProjects.getSelection();
+      if(selection != null && workingSetCombo.getSelectionIndex() < 0) {
+        workingSetCombo.setText(selection.getName());
       }
     });
 
     Button btnAssign = new Button(workingSetComposite, SWT.NONE);
     btnAssign.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
     btnAssign.setText(Messages.AssignWorkingSetDialog_btnAssign_text);
-    btnAssign.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        assignWorkingSets();
-        selectedProjects.reset();
-      }
-    });
+    btnAssign.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      assignWorkingSets();
+      selectedProjects.reset();
+    }));
 
     return area;
   }

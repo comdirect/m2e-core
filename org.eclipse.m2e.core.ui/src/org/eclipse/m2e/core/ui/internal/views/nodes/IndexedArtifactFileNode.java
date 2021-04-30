@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2018 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -76,10 +78,9 @@ public class IndexedArtifactFileNode extends PlatformObject implements IMavenRep
     return false;
   }
 
-  @SuppressWarnings("rawtypes")
   public static class AdapterFactory implements IAdapterFactory {
 
-    private static final Class[] ADAPTERS = new Class[] {ArtifactKey.class, IndexedArtifactFile.class};
+    private static final Class<?>[] ADAPTERS = new Class[] {ArtifactKey.class, IndexedArtifactFile.class};
 
     public <T> T getAdapter(Object adaptableObject, Class<T> adapterType) {
       if(adaptableObject instanceof IndexedArtifactFileNode) {

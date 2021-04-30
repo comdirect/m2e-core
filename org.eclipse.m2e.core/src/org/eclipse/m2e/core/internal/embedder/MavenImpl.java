@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -108,7 +110,6 @@ import org.apache.maven.model.Repository;
 import org.apache.maven.model.building.DefaultModelBuildingRequest;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.model.building.ModelProblemCollector;
-import org.apache.maven.model.building.ModelProblemCollectorRequest;
 import org.apache.maven.model.interpolation.ModelInterpolator;
 import org.apache.maven.model.io.ModelReader;
 import org.apache.maven.model.io.ModelWriter;
@@ -137,7 +138,6 @@ import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.ProjectBuildingResult;
 import org.apache.maven.project.ProjectSorter;
-import org.apache.maven.properties.internal.EnvironmentUtils;
 import org.apache.maven.repository.RepositorySystem;
 import org.apache.maven.settings.Mirror;
 import org.apache.maven.settings.Proxy;
@@ -245,12 +245,11 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
     request.setLocalRepository(localRepository);
     request.setLocalRepositoryPath(localRepository.getBasedir());
     request.setOffline(mavenConfiguration.isOffline());
-
+    
     request.getUserProperties().put("m2e.version", MavenPluginActivator.getVersion()); //$NON-NLS-1$
     request.getUserProperties().put(ConfigurationProperties.USER_AGENT, MavenPluginActivator.getUserAgent());
 
-    EnvironmentUtils.addEnvVars(request.getSystemProperties());
-    copyProperties(request.getSystemProperties(), System.getProperties());
+    MavenExecutionContext.populateSystemProperties(request);
 
     request.setCacheNotFound(true);
     request.setCacheTransferError(true);
@@ -563,6 +562,7 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
     }
   }
 
+  @SuppressWarnings("deprecation")
   public Model readModel(File pomFile) throws CoreException {
     try {
       BufferedInputStream is = new BufferedInputStream(new FileInputStream(pomFile));
@@ -709,6 +709,9 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
       configuration.setRemoteRepositories(child.getRemoteArtifactRepositories());
 
       File parentFile = child.getParentFile();
+      if(parentFile == null && child.getParent() != null) { // workaround MNG-6723
+        parentFile = child.getParent().getFile();
+      }
       if(parentFile != null) {
         return lookup(ProjectBuilder.class).build(parentFile, configuration).getProject();
       }
@@ -1354,10 +1357,7 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
   public void interpolateModel(MavenProject project, Model model) throws CoreException {
     ModelBuildingRequest request = new DefaultModelBuildingRequest();
     request.setUserProperties(project.getProperties());
-    ModelProblemCollector problems = new ModelProblemCollector() {
-      @Override
-      public void add(ModelProblemCollectorRequest req) {
-      }
+    ModelProblemCollector problems = req -> {
     };
     lookup(ModelInterpolator.class).interpolateModel(model, project.getBasedir(), request, problems);
   }

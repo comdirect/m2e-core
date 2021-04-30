@@ -1,9 +1,11 @@
 /*******************************************************************************
- * Copyright (c) 2008-2018 Sonatype, Inc.
+ * Copyright (c) 2008, 2019 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -221,11 +223,8 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       cpe = JavaCore.newContainerEntry(containerPath);
     }
 
-    IClasspathEntryDescriptor cped = classpath.replaceEntry(new ClasspathDescriptor.EntryFilter() {
-      public boolean accept(IClasspathEntryDescriptor descriptor) {
-        return JavaRuntime.JRE_CONTAINER.equals(descriptor.getPath().segment(0));
-      }
-    }, cpe);
+    IClasspathEntryDescriptor cped = classpath
+        .replaceEntry(descriptor -> JavaRuntime.JRE_CONTAINER.equals(descriptor.getPath().segment(0)), cpe);
 
     if(cped == null) {
       classpath.addEntry(cpe);
@@ -605,13 +604,11 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     if(jp != null && jp.getOption(JavaCore.COMPILER_PB_FORBIDDEN_REFERENCE, false) == null) {
       options.put(JavaCore.COMPILER_PB_FORBIDDEN_REFERENCE, JavaCore.WARNING);
     }
-    if(JavaSettingsUtils.isPreviewFeatureAvailable) {
-      options.put(JavaSettingsUtils.COMPILER_PB_ENABLE_PREVIEW_FEATURES,
-          enablePreviewFeatures ? JavaCore.ENABLED : JavaCore.DISABLED);
-      //preview features are enabled on purpose, so keep JDT quiet about it, unless specifically overridden by the user
-      if(jp != null && jp.getOption(JavaSettingsUtils.COMPILER_PB_REPORT_PREVIEW_FEATURES, false) == null) {
-        options.put(JavaSettingsUtils.COMPILER_PB_REPORT_PREVIEW_FEATURES, JavaCore.IGNORE);
-      }
+    options.put(JavaCore.COMPILER_PB_ENABLE_PREVIEW_FEATURES,
+        enablePreviewFeatures ? JavaCore.ENABLED : JavaCore.DISABLED);
+    //preview features are enabled on purpose, so keep JDT quiet about it, unless specifically overridden by the user
+    if(jp != null && jp.getOption(JavaCore.COMPILER_PB_REPORT_PREVIEW_FEATURES, false) == null) {
+      options.put(JavaCore.COMPILER_PB_REPORT_PREVIEW_FEATURES, JavaCore.IGNORE);
     }
   }
 
@@ -654,9 +651,6 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
 
   private boolean isEnablePreviewFeatures(MavenProject mavenProject, MojoExecution execution,
       IProgressMonitor monitor) {
-    if(!JavaSettingsUtils.isPreviewFeatureAvailable) {
-      return false;
-    }
     //1st, check the --enable-preview flag in the compilerArgs list
     try {
       List<?> args = maven.getMojoParameterValue(mavenProject, execution, "compilerArgs", List.class, monitor);//$NON-NLS-1$
@@ -738,7 +732,29 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
   }
 
   private int getLevelIndex(String level, List<String> levels) {
-    return level != null ? levels.indexOf(level) : -1;
+    int idx = -1;
+    if(level != null) {
+      idx = levels.indexOf(level);
+      if(idx < 0) {
+        //JDK level probably not yet supported by JDT
+        int highestIdx = levels.size() - 1;
+        try {
+          if(asDouble(level) > asDouble(levels.get(highestIdx))) {
+            //take highest known value
+            idx = highestIdx;
+          }
+        } catch(NumberFormatException ignore) {
+        }
+      }
+    }
+    return idx;
+  }
+
+  private double asDouble(String level) {
+    if(level == null || level.isEmpty()) {
+      return -1;
+    }
+    return Double.parseDouble(sanitizeJavaVersion(level));
   }
 
   public void unconfigure(ProjectConfigurationRequest request, IProgressMonitor monitor) throws CoreException {
@@ -780,12 +796,11 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     return new Path(relative.replace('\\', '/')); //$NON-NLS-1$ //$NON-NLS-2$
   }
 
-  public void configureClasspath(IMavenProjectFacade facade, IClasspathDescriptor classpath, IProgressMonitor monitor)
-      throws CoreException {
+  public void configureClasspath(IMavenProjectFacade facade, IClasspathDescriptor classpath, IProgressMonitor monitor) {
     ModuleSupport.configureClasspath(facade, classpath, monitor);
   }
 
   public void configureRawClasspath(ProjectConfigurationRequest request, IClasspathDescriptor classpath,
-      IProgressMonitor monitor) throws CoreException {
+      IProgressMonitor monitor) {
   }
 }

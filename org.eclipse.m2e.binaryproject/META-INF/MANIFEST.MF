@@ -1,13 +1,14 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: %Bundle-Name
 Bundle-SymbolicName: org.eclipse.m2e.binaryproject;singleton:=true
-Bundle-Version: 1.12.0.qualifier
+Bundle-Version: 1.17.0.qualifier
+Bundle-Localization: plugin
 Bundle-Vendor: %Bundle-Vendor
-Require-Bundle: org.eclipse.m2e.core;bundle-version="[1.12.0,1.13.0)",
- org.eclipse.m2e.maven.runtime;bundle-version="[1.12.0,1.13.0)",
- org.eclipse.m2e.sourcelookup;bundle-version="[1.12.0,1.13.0)",
- org.eclipse.m2e.jdt;bundle-version="[1.12.0,1.13.0)",
+Bundle-Name: %Bundle-Name
+Require-Bundle: org.eclipse.m2e.core;bundle-version="[1.16.0,2.0.0)",
+ org.eclipse.m2e.maven.runtime;bundle-version="[1.16.0,2.0.0)",
+ org.eclipse.m2e.sourcelookup;bundle-version="[1.16.0,2.0.0)",
+ org.eclipse.m2e.jdt;bundle-version="[1.16.0,2.0.0)",
  org.eclipse.equinox.common;bundle-version="3.6.0",
  org.eclipse.core.resources;bundle-version="3.7.0",
  org.eclipse.jdt.core;bundle-version="3.7.0",
@@ -20,3 +21,4 @@ Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Export-Package: org.eclipse.m2e.binaryproject.internal;x-friends:="org.eclipse.m2e.sourcelookup,org.eclipse.m2e.sourcelookup.ui"
 Bundle-ActivationPolicy: lazy
 Bundle-Activator: org.eclipse.m2e.binaryproject.internal.BinaryProjectPlugin
+Automatic-Module-Name: org.eclipse.m2e.binaryproject

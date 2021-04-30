@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -15,8 +17,6 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Text;
-
-import com.ibm.icu.lang.UCharacter;
 
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.wst.sse.core.internal.provisional.INodeAdapter;
@@ -91,9 +91,8 @@ public abstract class TranslatorAdapter implements INodeAdapter {
         if(e.getLocalName().equals(element.getLocalName())) {
           if(e == element) {
             return ret;
-          } else {
-            ret++ ;
           }
+          ret++ ;
         }
       }
     }
@@ -117,9 +116,8 @@ public abstract class TranslatorAdapter implements INodeAdapter {
         if(e.getLocalName().equals(element.getLocalName())) {
           if(e == element) {
             return ret;
-          } else {
-            ret++ ;
           }
+          ret++ ;
         }
       }
     }
@@ -154,9 +152,8 @@ public abstract class TranslatorAdapter implements INodeAdapter {
         if(e.getTagName().equals(name) || "*".equals(name)) { //$NON-NLS-1$
           if(matchCount == n) {
             return e;
-          } else {
-            matchCount++ ;
           }
+          matchCount++ ;
         }
       }
     }
@@ -293,7 +290,7 @@ public abstract class TranslatorAdapter implements INodeAdapter {
       } catch(BadLocationException ble) {
         // We check for bad locations so this should not happen
       }
-      if(UCharacter.isWhitespace(c)) {
+      if(Character.isWhitespace(c)) {
         i-- ;
       }
 
@@ -343,7 +340,7 @@ public abstract class TranslatorAdapter implements INodeAdapter {
       } catch(BadLocationException e) {
         // We check for bad locations so this should not happen
       }
-      if(UCharacter.isWhitespace(c) && !(c == '\r' || c == '\n')) {
+      if(Character.isWhitespace(c) && !(c == '\r' || c == '\n')) {
         builder.insert(0, c);
         i-- ;
       } else {

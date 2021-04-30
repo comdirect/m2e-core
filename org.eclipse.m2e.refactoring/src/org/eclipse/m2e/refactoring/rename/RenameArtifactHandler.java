@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2011, 2018 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -33,9 +35,7 @@ import org.eclipse.m2e.refactoring.internal.SaveDirtyFilesDialog;
 public class RenameArtifactHandler extends AbstractHandler {
   private static final Logger log = LoggerFactory.getLogger(RenameArtifactHandler.class);
 
-  /* (non-Javadoc)
-   * @see org.eclipse.core.commands.IHandler#execute(org.eclipse.core.commands.ExecutionEvent)
-   */
+  @Override
   public Object execute(ExecutionEvent event) throws ExecutionException {
     ISelection selection = computeSelection(event);
     if(!(selection instanceof IStructuredSelection)) {

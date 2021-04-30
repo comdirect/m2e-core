@@ -1,9 +1,11 @@
 /*************************************************************************************
  * Copyright (c) 2011-2014 Red Hat, Inc. and others.
  * All rights reserved. This program and the accompanying materials 
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  * 
  * Contributors:
  *     Fred Bricon / JBoss by Red Hat - Initial implementation.
@@ -192,7 +194,7 @@ public class ProfileManager implements IProfileManager {
     return "undefined"; //$NON-NLS-1$
   }
 
-  protected List<Profile> collectAvailableProfiles(List<Model> models, IProgressMonitor monitor) throws CoreException {
+  protected List<Profile> collectAvailableProfiles(List<Model> models, IProgressMonitor monitor) {
     List<Profile> profiles = new ArrayList<Profile>();
     for(Model m : models) {
       profiles.addAll(m.getProfiles());
@@ -246,9 +248,13 @@ public class ProfileManager implements IProfileManager {
   private RepositorySystem getRepositorySystem() {
     try {
       //TODO find an alternative way to get the Maven RepositorySystem, or use Aether directly to resolve models??
-      return MavenPluginActivator.getDefault().getPlexusContainer().lookup(RepositorySystem.class);
-    } catch(ComponentLookupException e) {
-      throw new NoSuchComponentException(e);
+      return MavenPluginActivator.getDefault().getMaven().lookup(RepositorySystem.class);
+    } catch(CoreException e) {
+      if(e.getStatus().getException() instanceof ComponentLookupException) {
+        throw new NoSuchComponentException((ComponentLookupException) e.getStatus().getException());
+      }
+      MavenProfilesCoreActivator.log(e.getStatus().getException());
+      throw new NoSuchComponentException(null);
     }
   }
 

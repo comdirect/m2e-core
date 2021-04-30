@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2011 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -30,7 +32,6 @@ import org.eclipse.equinox.internal.p2.ui.discovery.wizards.CatalogConfiguration
 import org.eclipse.equinox.internal.p2.ui.discovery.wizards.CatalogViewer;
 import org.eclipse.jface.dialogs.IMessageProvider;
 import org.eclipse.jface.operation.IRunnableContext;
-import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.window.IShellProvider;
 import org.eclipse.jface.wizard.WizardPage;
 import org.eclipse.ui.statushandlers.StatusManager;
@@ -64,8 +65,8 @@ public class MavenCatalogViewer extends CatalogViewer {
     final SubMonitor subMon = SubMonitor.convert(monitor, getCatalog().getItems().size() * 3);
     try {
       for(CatalogItem connector : getCatalog().getItems()) {
-        connector.setInstalled(installedFeatures != null
-            && installedFeatures.containsAll(connector.getInstallableUnits()));
+        connector
+            .setInstalled(installedFeatures != null && installedFeatures.containsAll(connector.getInstallableUnits()));
         subMon.worked(1);
       }
 
@@ -81,43 +82,15 @@ public class MavenCatalogViewer extends CatalogViewer {
         if(!selectedConfiguratorIds.isEmpty() || !selectedLifecycleIds.isEmpty() || !selectedMojos.isEmpty()
             || !selectedPackagingTypes.isEmpty()) {
           noneApplicable = true;
-          shellProvider.getShell().getDisplay().syncExec(new Runnable() {
-            @SuppressWarnings("synthetic-access")
-            public void run() {
-              for(CatalogItem ci : getCatalog().getItems()) {
-                boolean selected = false;
-                subMon.worked(2);
+          shellProvider.getShell().getDisplay().syncExec(() -> {
+            for(CatalogItem ci : getCatalog().getItems()) {
+              boolean selected = false;
+              subMon.worked(2);
 
-                LifecycleMappingMetadataSource src = MavenDiscovery.getLifecycleMappingMetadataSource(ci);
-                if(src != null) {
-                  for(String packagingType : selectedPackagingTypes) {
-                    if(hasPackaging(src, packagingType)) {
-                      selected = true;
-                      select(ci);
-                      break;
-                    }
-                  }
-                  if(selected) {
-                    continue;
-                  }
-                  for(MojoExecutionKey mojoExecution : selectedMojos) {
-                    if(matchesFilter(src, mojoExecution)) {
-                      selected = true;
-                      select(ci);
-                      break;
-                    }
-                  }
-                  if(selected) {
-                    continue;
-                  }
-                }
-
-                List<String> projectConfigurators = new ArrayList<String>();
-                List<String> mappingStrategies = new ArrayList<String>();
-                MavenDiscovery.getProvidedProjectConfigurators(ci, projectConfigurators, mappingStrategies);
-
-                for(String configuratorId : selectedConfiguratorIds) {
-                  if(projectConfigurators.contains(configuratorId)) {
+              LifecycleMappingMetadataSource src = MavenDiscovery.getLifecycleMappingMetadataSource(ci);
+              if(src != null) {
+                for(String packagingType : selectedPackagingTypes) {
+                  if(hasPackaging(src, packagingType)) {
                     selected = true;
                     select(ci);
                     break;
@@ -126,18 +99,43 @@ public class MavenCatalogViewer extends CatalogViewer {
                 if(selected) {
                   continue;
                 }
-
-                for(String lifecycleId : selectedLifecycleIds) {
-                  if(mappingStrategies.contains(lifecycleId)) {
+                for(MojoExecutionKey mojoExecution : selectedMojos) {
+                  if(matchesFilter(src, mojoExecution)) {
+                    selected = true;
                     select(ci);
                     break;
                   }
                 }
+                if(selected) {
+                  continue;
+                }
               }
-              if(noneApplicable) {
-                handleStatus(new Status(IStatus.ERROR, DiscoveryActivator.PLUGIN_ID,
-                    Messages.MavenCatalogViewer_noApplicableCatalogItems));
+
+              List<String> projectConfigurators = new ArrayList<String>();
+              List<String> mappingStrategies = new ArrayList<String>();
+              MavenDiscovery.getProvidedProjectConfigurators(ci, projectConfigurators, mappingStrategies);
+
+              for(String configuratorId : selectedConfiguratorIds) {
+                if(projectConfigurators.contains(configuratorId)) {
+                  selected = true;
+                  select(ci);
+                  break;
+                }
               }
+              if(selected) {
+                continue;
+              }
+
+              for(String lifecycleId : selectedLifecycleIds) {
+                if(mappingStrategies.contains(lifecycleId)) {
+                  select(ci);
+                  break;
+                }
+              }
+            }
+            if(noneApplicable) {
+              handleStatus(new Status(IStatus.ERROR, DiscoveryActivator.PLUGIN_ID,
+                  Messages.MavenCatalogViewer_noApplicableCatalogItems));
             }
           });
         }
@@ -153,24 +151,21 @@ public class MavenCatalogViewer extends CatalogViewer {
     boolean wasError = false;
     final IStatus[] result = new IStatus[1];
     try {
-      context.run(true, true, new IRunnableWithProgress() {
-        @SuppressWarnings("synthetic-access")
-        public void run(IProgressMonitor monitor) throws InterruptedException {
-          SubMonitor submon = SubMonitor.convert(monitor, 100);
-          try {
-            if(installedFeatures == null) {
-              installedFeatures = getInstalledFeatures(submon.newChild(10));
-            }
-            result[0] = getCatalog().performDiscovery(submon.newChild(80));
-            if(monitor.isCanceled()) {
-              throw new InterruptedException();
-            }
-            if(!getCatalog().getItems().isEmpty()) {
-              postDiscovery(submon.newChild(10));
-            }
-          } finally {
-            submon.done();
+      context.run(true, true, monitor -> {
+        SubMonitor submon = SubMonitor.convert(monitor, 100);
+        try {
+          if(installedFeatures == null) {
+            installedFeatures = getInstalledFeatures(submon.newChild(10));
           }
+          result[0] = getCatalog().performDiscovery(submon.newChild(80));
+          if(monitor.isCanceled()) {
+            throw new InterruptedException();
+          }
+          if(!getCatalog().getItems().isEmpty()) {
+            postDiscovery(submon.newChild(10));
+          }
+        } finally {
+          submon.done();
         }
       });
     } catch(InvocationTargetException e) {
@@ -203,18 +198,16 @@ public class MavenCatalogViewer extends CatalogViewer {
     }
 
     if(shellProvider instanceof WizardPage) {
-      shellProvider.getShell().getDisplay().asyncExec(new Runnable() {
-        public void run() {
-          // Display the error in the wizard header
-          int messageType = IMessageProvider.INFORMATION;
-          if(status.matches(IStatus.ERROR)) {
-            messageType = IMessageProvider.ERROR;
-          } else if(status.matches(IStatus.WARNING)) {
-            messageType = IMessageProvider.WARNING;
-          }
-          ((WizardPage) shellProvider).setMessage(status.getMessage(), messageType);
-          StatusManager.getManager().handle(status);
+      shellProvider.getShell().getDisplay().asyncExec(() -> {
+        // Display the error in the wizard header
+        int messageType = IMessageProvider.INFORMATION;
+        if(status.matches(IStatus.ERROR)) {
+          messageType = IMessageProvider.ERROR;
+        } else if(status.matches(IStatus.WARNING)) {
+          messageType = IMessageProvider.WARNING;
         }
+        ((WizardPage) shellProvider).setMessage(status.getMessage(), messageType);
+        StatusManager.getManager().handle(status);
       });
     } else {
       StatusManager.getManager().handle(status, StatusManager.SHOW | StatusManager.BLOCK | StatusManager.LOG);

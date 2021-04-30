@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -28,7 +30,6 @@ import static org.eclipse.m2e.core.ui.internal.editing.PomEdits.setText;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import org.eclipse.core.resources.IFile;
@@ -89,36 +90,34 @@ public class AddDependencyAction extends MavenActionSupport implements IWorkbenc
           if(indexedArtifactFile.version == null) {
             dependency.setVersion(null);
           }
-          performOnDOMDocument(new OperationTuple(file, new Operation() {
-            public void process(Document document) {
-              Element depsEl = getChild(document.getDocumentElement(), DEPENDENCIES);
-              Element dep = findChild(depsEl, DEPENDENCY, childEquals(GROUP_ID, dependency.getGroupId()),
-                  childEquals(ARTIFACT_ID, dependency.getArtifactId()));
-              if(dep == null) {
-                dep = PomHelper.createDependency(depsEl, dependency.getGroupId(), dependency.getArtifactId(),
-                    dependency.getVersion());
-              } else {
-                //only set version if already exists
-                if(dependency.getVersion() != null) {
-                  setText(getChild(dep, VERSION), dependency.getVersion());
-                }
+          performOnDOMDocument(new OperationTuple(file, (Operation) document -> {
+            Element depsEl = getChild(document.getDocumentElement(), DEPENDENCIES);
+            Element dep = findChild(depsEl, DEPENDENCY, childEquals(GROUP_ID, dependency.getGroupId()),
+                childEquals(ARTIFACT_ID, dependency.getArtifactId()));
+            if(dep == null) {
+              dep = PomHelper.createDependency(depsEl, dependency.getGroupId(), dependency.getArtifactId(),
+                  dependency.getVersion());
+            } else {
+              //only set version if already exists
+              if(dependency.getVersion() != null) {
+                setText(getChild(dep, VERSION), dependency.getVersion());
               }
-              if(dependency.getType() != null //
-                  && !"jar".equals(dependency.getType()) // //$NON-NLS-1$
-                  && !"null".equals(dependency.getType())) { // guard against MNGECLIPSE-622 //$NON-NLS-1$
-
-                setText(getChild(dep, TYPE), dependency.getType());
-              }
-
-              if(dependency.getClassifier() != null) {
-                setText(getChild(dep, CLASSIFIER), dependency.getClassifier());
-              }
-
-              if(dependency.getScope() != null && !"compile".equals(dependency.getScope())) { //$NON-NLS-1$
-                setText(getChild(dep, SCOPE), dependency.getScope());
-              }
-
             }
+            if(dependency.getType() != null //
+                && !"jar".equals(dependency.getType()) // //$NON-NLS-1$
+                && !"null".equals(dependency.getType())) { // guard against MNGECLIPSE-622 //$NON-NLS-1$
+
+              setText(getChild(dep, TYPE), dependency.getType());
+            }
+
+            if(dependency.getClassifier() != null) {
+              setText(getChild(dep, CLASSIFIER), dependency.getClassifier());
+            }
+
+            if(dependency.getScope() != null && !"compile".equals(dependency.getScope())) { //$NON-NLS-1$
+              setText(getChild(dep, SCOPE), dependency.getScope());
+            }
+
           }));
         } catch(Exception ex) {
           String msg = NLS.bind(Messages.AddDependencyAction_error_msg, file);

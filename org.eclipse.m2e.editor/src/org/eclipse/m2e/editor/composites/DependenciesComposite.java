@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2018 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -41,7 +43,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import org.eclipse.core.runtime.CoreException;
@@ -55,19 +56,13 @@ import org.eclipse.jface.action.ToolBarManager;
 import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.viewers.DelegatingStyledCellLabelProvider;
 import org.eclipse.jface.viewers.ISelection;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerFilter;
 import org.eclipse.jface.window.Window;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.SashForm;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -90,7 +85,6 @@ import org.eclipse.m2e.core.project.IMavenProjectFacade;
 import org.eclipse.m2e.core.project.IMavenProjectRegistry;
 import org.eclipse.m2e.core.ui.internal.dialogs.EditDependencyDialog;
 import org.eclipse.m2e.core.ui.internal.dialogs.MavenRepositorySearchDialog;
-import org.eclipse.m2e.core.ui.internal.editing.PomEdits.Operation;
 import org.eclipse.m2e.core.ui.internal.editing.PomEdits.OperationTuple;
 import org.eclipse.m2e.core.ui.internal.editing.PomHelper;
 import org.eclipse.m2e.core.ui.internal.util.ParentGatherer;
@@ -199,106 +193,95 @@ public class DependenciesComposite extends Composite {
     dependenciesEditor.setCellLabelProvider(new DelegatingStyledCellLabelProvider(dependencyLabelProvider));
     dependenciesEditor.setContentProvider(dependenciesContentProvider);
 
-    dependenciesEditor.setRemoveButtonListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        final List<Object> dependencyList = dependenciesEditor.getSelection();
-        try {
-          editorPage.performEditOperation(new Operation() {
-            public void process(Document document) {
-              Element deps = findChild(document.getDocumentElement(), DEPENDENCIES);
-              if(deps == null) {
-                //TODO log
-                return;
-              }
-              for(Object dependency : dependencyList) {
-                if(dependency instanceof Dependency) {
-                  Element dep = findChild(deps, DEPENDENCY, childEquals(GROUP_ID, ((Dependency) dependency).groupId),
-                      childEquals(ARTIFACT_ID, ((Dependency) dependency).artifactId));
-                  removeChild(deps, dep);
-                }
-              }
-              removeIfNoChildElement(deps);
-            }
-          }, log, "error removing dependencies");
-        } finally {
-          setDependenciesInput();
-        }
-      }
-    });
-
-    dependenciesEditor.setPropertiesListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        Object selection = dependenciesEditor.getSelection().get(0);
-        if(selection instanceof Dependency) {
-          Dependency dependency = (Dependency) selection;
-          EditDependencyDialog d = new EditDependencyDialog(getShell(), false, editorPage.getProject(),
-              editorPage.getPomEditor().getMavenProject());
-          d.setDependency(toApacheDependency(dependency));
-          if(d.open() == Window.OK) {
-            try {
-              editorPage.performEditOperation(d.getEditOperation(), log, "Error updating dependency");
-            } finally {
-              setDependenciesInput();
-              dependenciesEditor.setSelection(Collections.singletonList((Object) dependency));
+    dependenciesEditor.setRemoveButtonListener(SelectionListener.widgetSelectedAdapter(e -> {
+      final List<Object> dependencyList = dependenciesEditor.getSelection();
+      try {
+        editorPage.performEditOperation(document -> {
+          Element deps = findChild(document.getDocumentElement(), DEPENDENCIES);
+          if(deps == null) {
+            //TODO log
+            return;
+          }
+          for(Object dependency : dependencyList) {
+            if(dependency instanceof Dependency) {
+              Element dep = findChild(deps, DEPENDENCY, childEquals(GROUP_ID, ((Dependency) dependency).groupId),
+                  childEquals(ARTIFACT_ID, ((Dependency) dependency).artifactId));
+              removeChild(deps, dep);
             }
           }
-        } else if(selection instanceof org.apache.maven.model.Dependency) {
-          /*
-           * TODO: Support editing or displaying of inherited/managed dependencies.
-           */
-        }
+          removeIfNoChildElement(deps);
+        }, log, "error removing dependencies");
+      } finally {
+        setDependenciesInput();
       }
+    }));
 
-    });
+    dependenciesEditor.setPropertiesListener(SelectionListener.widgetSelectedAdapter(e -> {
+      Object selection = dependenciesEditor.getSelection().get(0);
+      if(selection instanceof Dependency) {
+        Dependency dependency = (Dependency) selection;
+        EditDependencyDialog d = new EditDependencyDialog(getShell(), false, editorPage.getProject(),
+            editorPage.getPomEditor().getMavenProject());
+        d.setDependency(toApacheDependency(dependency));
+        if(d.open() == Window.OK) {
+          try {
+            editorPage.performEditOperation(d.getEditOperation(), log, "Error updating dependency");
+          } finally {
+            setDependenciesInput();
+            dependenciesEditor.setSelection(Collections.singletonList((Object) dependency));
+          }
+        }
+      } else if(selection instanceof org.apache.maven.model.Dependency) {
+        /*
+         * TODO: Support editing or displaying of inherited/managed dependencies.
+         */
+      }
+    }
+
+    ));
 
     dependenciesSection.setClient(dependenciesEditor);
     toolkit.adapt(dependenciesEditor);
     toolkit.paintBordersFor(dependenciesEditor);
 
-    dependenciesEditor.setManageButtonListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        try {
-          openManageDependenciesDialog();
-        } catch(InvocationTargetException e1) {
-          MavenEditorPlugin.getDefault().getLog()
-              .log(new Status(IStatus.ERROR, MavenEditorPlugin.PLUGIN_ID, "Error: ", e1)); //$NON-NLS-1$
-        } catch(InterruptedException e1) {
-          MavenEditorPlugin.getDefault().getLog()
-              .log(new Status(IStatus.ERROR, MavenEditorPlugin.PLUGIN_ID, "Error: ", e1)); //$NON-NLS-1$
-        }
+    dependenciesEditor.setManageButtonListener(SelectionListener.widgetSelectedAdapter(e -> {
+      try {
+        openManageDependenciesDialog();
+      } catch(InvocationTargetException e1) {
+        MavenEditorPlugin.getDefault().getLog()
+            .log(new Status(IStatus.ERROR, MavenEditorPlugin.PLUGIN_ID, "Error: ", e1)); //$NON-NLS-1$
+      } catch(InterruptedException e1) {
+        MavenEditorPlugin.getDefault().getLog()
+            .log(new Status(IStatus.ERROR, MavenEditorPlugin.PLUGIN_ID, "Error: ", e1)); //$NON-NLS-1$
       }
-    });
+    }));
 
-    dependenciesEditor.setAddButtonListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        final MavenRepositorySearchDialog addDepDialog = MavenRepositorySearchDialog.createSearchDependencyDialog(
-            getShell(), Messages.DependenciesComposite_action_selectDependency,
-            editorPage.getPomEditor().getMavenProject(), editorPage.getProject(), false);
+    dependenciesEditor.setAddButtonListener(SelectionListener.widgetSelectedAdapter(e -> {
+      final MavenRepositorySearchDialog addDepDialog = MavenRepositorySearchDialog.createSearchDependencyDialog(
+          getShell(), Messages.DependenciesComposite_action_selectDependency,
+          editorPage.getPomEditor().getMavenProject(), editorPage.getProject(), false);
 
-        if(addDepDialog.open() == Window.OK) {
-          final IndexedArtifactFile dep = (IndexedArtifactFile) addDepDialog.getFirstResult();
-          final String selectedScope = addDepDialog.getSelectedScope();
-          try {
-            editorPage.performEditOperation(new Operation() {
-              public void process(Document document) {
-                Element depsEl = getChild(document.getDocumentElement(), DEPENDENCIES);
-                PomHelper.addOrUpdateDependency(depsEl, dep.group, dep.artifact,
-                    isManaged(dep.group, dep.artifact, dep.version) ? null : dep.version, dep.type, selectedScope,
-                    dep.classifier);
-              }
-            }, log, "errror adding dependency");
-          } finally {
-            setDependenciesInput();
-            List<Dependency> deps = getDependencies();
-            if(deps.size() > 0) {
-              dependenciesEditor.setSelection(Collections.<Object> singletonList(deps.get(deps.size() - 1)));
-            }
+      if(addDepDialog.open() == Window.OK) {
+        final IndexedArtifactFile dep = (IndexedArtifactFile) addDepDialog.getFirstResult();
+        final String selectedScope = addDepDialog.getSelectedScope();
+        try {
+          editorPage.performEditOperation(document -> {
+            Element depsEl = getChild(document.getDocumentElement(), DEPENDENCIES);
+            PomHelper.addOrUpdateDependency(depsEl, dep.group, dep.artifact,
+                isManaged(dep.group, dep.artifact, dep.version) ? null : dep.version, dep.type, selectedScope,
+                dep.classifier);
+          }, log, "errror adding dependency");
+        } finally {
+          setDependenciesInput();
+          List<Dependency> deps = getDependencies();
+          if(deps.size() > 0) {
+            dependenciesEditor.setSelection(Collections.<Object> singletonList(deps.get(deps.size() - 1)));
           }
         }
       }
+    }
 
-    });
+    ));
 
     ToolBarManager modulesToolBarManager = new ToolBarManager(SWT.FLAT);
 
@@ -409,94 +392,82 @@ public class DependenciesComposite extends Composite {
     dependencyManagementEditor.setLabelProvider(dependencyManagementLabelProvider);
     dependencyManagementSection.setClient(dependencyManagementEditor);
 
-    dependencyManagementEditor.setRemoveButtonListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        final List<Dependency> dependencyList = dependencyManagementEditor.getSelection();
+    dependencyManagementEditor.setRemoveButtonListener(SelectionListener.widgetSelectedAdapter(e -> {
+      final List<Dependency> dependencyList = dependencyManagementEditor.getSelection();
+      try {
+        editorPage.performEditOperation(document -> {
+          Element deps = findChild(findChild(document.getDocumentElement(), DEPENDENCY_MANAGEMENT), DEPENDENCIES);
+          if(deps == null) {
+            //TODO log
+            return;
+          }
+          for(Dependency dependency : dependencyList) {
+            Element dep = findChild(deps, DEPENDENCY, childEquals(GROUP_ID, dependency.groupId),
+                childEquals(ARTIFACT_ID, dependency.artifactId));
+            removeChild(deps, dep);
+          }
+          removeIfNoChildElement(deps);
+        }, log, "error removing managed dependencies");
+      } finally {
+        setDependencyManagementInput();
+        dependenciesEditor.refresh();
+      }
+    }));
+
+    dependencyManagementEditor.setPropertiesListener(SelectionListener.widgetSelectedAdapter(e -> {
+      Dependency dependency = dependencyManagementEditor.getSelection().get(0);
+      EditDependencyDialog d = new EditDependencyDialog(getShell(), true, editorPage.getProject(),
+          editorPage.getPomEditor().getMavenProject());
+      d.setDependency(toApacheDependency(dependency));
+      if(d.open() == Window.OK) {
         try {
-          editorPage.performEditOperation(new Operation() {
-            public void process(Document document) {
-              Element deps = findChild(findChild(document.getDocumentElement(), DEPENDENCY_MANAGEMENT), DEPENDENCIES);
-              if(deps == null) {
-                //TODO log
-                return;
-              }
-              for(Dependency dependency : dependencyList) {
-                Element dep = findChild(deps, DEPENDENCY, childEquals(GROUP_ID, dependency.groupId),
-                    childEquals(ARTIFACT_ID, dependency.artifactId));
-                removeChild(deps, dep);
-              }
-              removeIfNoChildElement(deps);
-            }
-          }, log, "error removing managed dependencies");
+          editorPage.performEditOperation(d.getEditOperation(), log, "Error updating dependency");
         } finally {
           setDependencyManagementInput();
+          dependencyManagementEditor.setSelection(Collections.singletonList(dependency));
+          //refresh this one to update decorations..
           dependenciesEditor.refresh();
         }
       }
-    });
+    }));
 
-    dependencyManagementEditor.setPropertiesListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        Dependency dependency = dependencyManagementEditor.getSelection().get(0);
-        EditDependencyDialog d = new EditDependencyDialog(getShell(), true, editorPage.getProject(),
-            editorPage.getPomEditor().getMavenProject());
-        d.setDependency(toApacheDependency(dependency));
-        if(d.open() == Window.OK) {
-          try {
-            editorPage.performEditOperation(d.getEditOperation(), log, "Error updating dependency");
-          } finally {
-            setDependencyManagementInput();
-            dependencyManagementEditor.setSelection(Collections.singletonList(dependency));
-            //refresh this one to update decorations..
-            dependenciesEditor.refresh();
-          }
-        }
-      }
-    });
+    dependencyManagementEditor.addSelectionListener(event -> {
+      List<Dependency> selection = dependencyManagementEditor.getSelection();
 
-    dependencyManagementEditor.addSelectionListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent event) {
-        List<Dependency> selection = dependencyManagementEditor.getSelection();
-
-        if(!selection.isEmpty()) {
-          dependenciesEditor.setSelection(Collections.<Object> emptyList());
-        }
+      if(!selection.isEmpty()) {
+        dependenciesEditor.setSelection(Collections.<Object> emptyList());
       }
     });
 
     toolkit.adapt(dependencyManagementEditor);
     toolkit.paintBordersFor(dependencyManagementEditor);
 
-    dependencyManagementEditor.setAddButtonListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        final MavenRepositorySearchDialog addDepDialog = MavenRepositorySearchDialog.createSearchDependencyDialog(
-            getShell(), Messages.DependenciesComposite_action_selectDependency,
-            editorPage.getPomEditor().getMavenProject(), editorPage.getProject(), true);
-        if(addDepDialog.open() == Window.OK) {
-          final IndexedArtifactFile dep = (IndexedArtifactFile) addDepDialog.getFirstResult();
-          final String selectedScope = addDepDialog.getSelectedScope();
-          try {
-            editorPage.performEditOperation(new Operation() {
-              public void process(Document document) {
-                Element depsEl = getChild(document.getDocumentElement(), DEPENDENCY_MANAGEMENT, DEPENDENCIES);
-                PomHelper.addOrUpdateDependency(depsEl, dep.group, dep.artifact, dep.version, dep.type, selectedScope,
-                    dep.classifier);
-              }
-            }, log, "errror adding dependency");
-          } finally {
-            setDependencyManagementInput();
-            List<Dependency> dlist = getManagedDependencies();
-            if(dlist.size() > 0) {
-              dependencyManagementEditor
-                  .setSelection(Collections.<Dependency> singletonList(dlist.get(dlist.size() - 1)));
-            }
-            //refresh this one to update decorations..
-            dependenciesEditor.refresh();
+    dependencyManagementEditor.setAddButtonListener(SelectionListener.widgetSelectedAdapter(e -> {
+      final MavenRepositorySearchDialog addDepDialog = MavenRepositorySearchDialog.createSearchDependencyDialog(
+          getShell(), Messages.DependenciesComposite_action_selectDependency,
+          editorPage.getPomEditor().getMavenProject(), editorPage.getProject(), true);
+      if(addDepDialog.open() == Window.OK) {
+        final IndexedArtifactFile dep = (IndexedArtifactFile) addDepDialog.getFirstResult();
+        final String selectedScope = addDepDialog.getSelectedScope();
+        try {
+          editorPage.performEditOperation(document -> {
+            Element depsEl = getChild(document.getDocumentElement(), DEPENDENCY_MANAGEMENT, DEPENDENCIES);
+            PomHelper.addOrUpdateDependency(depsEl, dep.group, dep.artifact, dep.version, dep.type, selectedScope,
+                dep.classifier);
+          }, log, "errror adding dependency");
+        } finally {
+          setDependencyManagementInput();
+          List<Dependency> dlist = getManagedDependencies();
+          if(dlist.size() > 0) {
+            dependencyManagementEditor
+                .setSelection(Collections.<Dependency> singletonList(dlist.get(dlist.size() - 1)));
           }
-
+          //refresh this one to update decorations..
+          dependenciesEditor.refresh();
         }
+
       }
-    });
+    }));
 
     ToolBarManager modulesToolBarManager = new ToolBarManager(SWT.FLAT);
 
@@ -627,13 +598,11 @@ public class DependenciesComposite extends Composite {
     };
 
     // Run the update job when the user modifies the filter text.
-    this.searchControl.getSearchText().addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        // The net effect here is that the field will update 200 ms after
-        // the user stops typing.
-        updateJob.cancel();
-        updateJob.schedule(200);
-      }
+    this.searchControl.getSearchText().addModifyListener(e -> {
+      // The net effect here is that the field will update 200 ms after
+      // the user stops typing.
+      updateJob.cancel();
+      updateJob.schedule(200);
     });
   }
 
@@ -663,17 +632,15 @@ public class DependenciesComposite extends Composite {
      */
     final List<ParentHierarchyEntry> hierarchy = new ArrayList<ParentHierarchyEntry>();
 
-    IRunnableWithProgress projectLoader = new IRunnableWithProgress() {
-      public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException {
-        try {
-          IMavenProjectRegistry projectManager = MavenPlugin.getMavenProjectRegistry();
-          IMavenProjectFacade projectFacade = projectManager.create(pomEditor.getPomFile(), true, monitor);
-          if(projectFacade != null) {
-            hierarchy.addAll(new ParentGatherer(projectFacade).getParentHierarchy(monitor));
-          }
-        } catch(CoreException e) {
-          throw new InvocationTargetException(e);
+    IRunnableWithProgress projectLoader = monitor -> {
+      try {
+        IMavenProjectRegistry projectManager = MavenPlugin.getMavenProjectRegistry();
+        IMavenProjectFacade projectFacade = projectManager.create(pomEditor.getPomFile(), true, monitor);
+        if(projectFacade != null) {
+          hierarchy.addAll(new ParentGatherer(projectFacade).getParentHierarchy(monitor));
         }
+      } catch(CoreException e) {
+        throw new InvocationTargetException(e);
       }
     };
 
@@ -731,14 +698,12 @@ public class DependenciesComposite extends Composite {
       if(manageddependencies == null) {
         manageddependencies = new ArrayList<Dependency>();
         try {
-          performOnDOMDocument(new OperationTuple(pomEditor.getDocument(), new Operation() {
-            public void process(Document document) {
-              Element dms = findChild(findChild(document.getDocumentElement(), DEPENDENCY_MANAGEMENT), DEPENDENCIES);
-              for(Element depEl : findChilds(dms, DEPENDENCY)) {
-                Dependency dep = toDependency(depEl);
-                if(dep != null) {
-                  manageddependencies.add(dep);
-                }
+          performOnDOMDocument(new OperationTuple(pomEditor.getDocument(), document -> {
+            Element dms = findChild(findChild(document.getDocumentElement(), DEPENDENCY_MANAGEMENT), DEPENDENCIES);
+            for(Element depEl : findChilds(dms, DEPENDENCY)) {
+              Dependency dep = toDependency(depEl);
+              if(dep != null) {
+                manageddependencies.add(dep);
               }
             }
           }, true));
@@ -763,14 +728,12 @@ public class DependenciesComposite extends Composite {
       if(dependencies == null) {
         dependencies = new ArrayList<Dependency>();
         try {
-          performOnDOMDocument(new OperationTuple(pomEditor.getDocument(), new Operation() {
-            public void process(Document document) {
-              Element dms = findChild(document.getDocumentElement(), DEPENDENCIES);
-              for(Element depEl : findChilds(dms, DEPENDENCY)) {
-                Dependency dep = toDependency(depEl);
-                if(dep != null) {
-                  dependencies.add(dep);
-                }
+          performOnDOMDocument(new OperationTuple(pomEditor.getDocument(), document -> {
+            Element dms = findChild(document.getDocumentElement(), DEPENDENCIES);
+            for(Element depEl : findChilds(dms, DEPENDENCY)) {
+              Dependency dep = toDependency(depEl);
+              if(dep != null) {
+                dependencies.add(dep);
               }
             }
           }, true));

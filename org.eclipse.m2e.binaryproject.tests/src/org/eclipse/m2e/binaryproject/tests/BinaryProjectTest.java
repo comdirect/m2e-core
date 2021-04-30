@@ -1,14 +1,21 @@
 /*******************************************************************************
  * Copyright (c) 2012 Igor Fedorenko
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Igor Fedorenko - initial API and implementation
  *******************************************************************************/
 package org.eclipse.m2e.binaryproject.tests;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import org.eclipse.core.resources.ICommand;
 import org.eclipse.core.resources.IProject;
@@ -25,11 +32,13 @@ import org.eclipse.m2e.core.project.IMavenProjectFacade;
 import org.eclipse.m2e.jdt.internal.BuildPathManager;
 import org.eclipse.m2e.tests.common.AbstractMavenProjectTestCase;
 import org.eclipse.m2e.tests.common.ClasspathHelpers;
+import org.junit.Test;
 
 @SuppressWarnings({"restriction"})
 public class BinaryProjectTest extends AbstractMavenProjectTestCase {
   IProgressMonitor monitor = new NullProgressMonitor();
 
+  @Test
   public void testBasic() throws Exception {
     IProject project =
         BinaryProjectPlugin.getInstance().create("org.apache.maven", "maven-core", "3.0.4", null, monitor);

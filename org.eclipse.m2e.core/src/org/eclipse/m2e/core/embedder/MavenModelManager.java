@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -14,6 +16,7 @@ package org.eclipse.m2e.core.embedder;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
 import java.util.Collections;
@@ -91,12 +94,25 @@ public class MavenModelManager {
     return maven.readModel(reader);
   }
 
+  /**
+   * @deprecated use {@link #readMavenModel(InputStream)} instead.
+   */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public org.apache.maven.model.Model readMavenModel(File pomFile) throws CoreException {
     return maven.readModel(pomFile);
   }
 
+  /**
+   * @deprecated use {@link #readMavenModel(InputStream)} instead.
+   */
+  @Deprecated
   public org.apache.maven.model.Model readMavenModel(IFile pomFile) throws CoreException {
-    return maven.readModel(pomFile.getLocation().toFile());
+    try (InputStream is = pomFile.getContents()) {
+      return maven.readModel(is);
+    } catch(IOException ex) {
+      throw new CoreException(new Status(IStatus.ERROR, IMavenConstants.PLUGIN_ID, -1, null, ex));
+    }
   }
 
   public void createMavenModel(IFile pomFile, org.apache.maven.model.Model model) throws CoreException {
@@ -182,11 +198,7 @@ public class MavenModelManager {
       final String scope, IProgressMonitor monitor) throws CoreException {
     monitor.setTaskName(Messages.MavenModelManager_monitor_building);
 
-    ICallable<DependencyNode> callable = new ICallable<DependencyNode>() {
-      public DependencyNode call(IMavenExecutionContext context, IProgressMonitor monitor) throws CoreException {
-        return readDependencyTree(context.getRepositorySession(), mavenProject, scope);
-      }
-    };
+    ICallable<DependencyNode> callable = (context1, monitor1) -> readDependencyTree(context1.getRepositorySession(), mavenProject, scope);
 
     return (context != null) ? projectManager.execute(context, callable, monitor) : maven.execute(callable, monitor);
   }

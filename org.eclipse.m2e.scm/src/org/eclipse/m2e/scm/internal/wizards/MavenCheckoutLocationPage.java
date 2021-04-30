@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2012 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -24,9 +26,7 @@ import org.eclipse.core.runtime.RegistryFactory;
 import org.eclipse.jface.wizard.IWizardContainer;
 import org.eclipse.jface.wizard.WizardDialog;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
@@ -94,11 +94,7 @@ public class MavenCheckoutLocationPage extends AbstractMavenWizardPage {
     composite.setLayout(gridLayout);
     setControl(composite);
 
-    SelectionAdapter selectionAdapter = new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        updatePage();
-      }
-    };
+    SelectionListener selectionAdapter = SelectionListener.widgetSelectedAdapter(e -> updatePage());
 
     if(scmUrls == null || scmUrls.length < 2) {
       Label urlLabel = new Label(composite, SWT.NONE);
@@ -113,14 +109,12 @@ public class MavenCheckoutLocationPage extends AbstractMavenWizardPage {
       for(int i = 0; i < types.length; i++ ) {
         scmTypeCombo.add(types[i]);
       }
-      scmTypeCombo.addModifyListener(new ModifyListener() {
-        public void modifyText(ModifyEvent e) {
-          String newScmType = scmTypeCombo.getText();
-          if(!newScmType.equals(scmType)) {
-            scmType = newScmType;
-            scmUrlCombo.setText(""); //$NON-NLS-1$
-            updatePage();
-          }
+      scmTypeCombo.addModifyListener(e -> {
+        String newScmType = scmTypeCombo.getText();
+        if(!newScmType.equals(scmType)) {
+          scmType = newScmType;
+          scmUrlCombo.setText(""); //$NON-NLS-1$
+          updatePage();
         }
       });
 
@@ -168,35 +162,29 @@ public class MavenCheckoutLocationPage extends AbstractMavenWizardPage {
       }
     }
 
-    revisionText.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        updatePage();
-      }
-    });
+    revisionText.addModifyListener(e -> updatePage());
 
     revisionBrowseButton = new Button(composite, SWT.NONE);
     GridData gd_revisionBrowseButton = new GridData(SWT.LEFT, SWT.CENTER, false, false, 2, 1);
     gd_revisionBrowseButton.verticalIndent = 3;
     revisionBrowseButton.setLayoutData(gd_revisionBrowseButton);
     revisionBrowseButton.setText(Messages.MavenCheckoutLocationPage_btnRevSelect);
-    revisionBrowseButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        String url = scmParentUrl;
-        if(url == null) {
-          return;
-        }
-
-        String scmType = scmTypeCombo.getText();
-
-        ScmHandlerUi handlerUi = ScmHandlerFactory.getHandlerUiByType(scmType);
-        String revision = handlerUi.selectRevision(getShell(), scmUrls[0], revisionText.getText());
-        if(revision != null) {
-          revisionText.setText(revision);
-          headRevisionButton.setSelection(false);
-          updatePage();
-        }
+    revisionBrowseButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      String url = scmParentUrl;
+      if(url == null) {
+        return;
       }
-    });
+
+      String scmType = scmTypeCombo.getText();
+
+      ScmHandlerUi handlerUi = ScmHandlerFactory.getHandlerUiByType(scmType);
+      String revision = handlerUi.selectRevision(getShell(), scmUrls[0], revisionText.getText());
+      if(revision != null) {
+        revisionText.setText(revision);
+        headRevisionButton.setSelection(false);
+        updatePage();
+      }
+    }));
 
     checkoutAllProjectsButton = new Button(composite, SWT.CHECK);
     GridData checkoutAllProjectsData = new GridData(SWT.LEFT, SWT.TOP, true, false, 5, 1);
@@ -204,11 +192,7 @@ public class MavenCheckoutLocationPage extends AbstractMavenWizardPage {
     checkoutAllProjectsButton.setLayoutData(checkoutAllProjectsData);
     checkoutAllProjectsButton.setText(Messages.MavenCheckoutLocationPage_btnCheckout);
     checkoutAllProjectsButton.setSelection(true);
-    checkoutAllProjectsButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        updatePage();
-      }
-    });
+    checkoutAllProjectsButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> updatePage()));
 
     GridData advancedSettingsData = new GridData(SWT.FILL, SWT.TOP, true, false, 5, 1);
     advancedSettingsData.verticalIndent = 10;
@@ -220,51 +204,43 @@ public class MavenCheckoutLocationPage extends AbstractMavenWizardPage {
     }
 
     if(scmUrls == null || scmUrls.length < 2) {
-      scmUrlBrowseButton.addSelectionListener(new SelectionAdapter() {
-        public void widgetSelected(SelectionEvent e) {
-          ScmHandlerUi handlerUi = ScmHandlerFactory.getHandlerUiByType(scmType);
-          // XXX should use null if there is no scmUrl selected
-          ScmUrl currentUrl = scmUrls == null || scmUrls.length == 0 ? new ScmUrl("scm:" + scmType + ":") : scmUrls[0]; //$NON-NLS-1$ //$NON-NLS-2$
-          ScmUrl scmUrl = handlerUi.selectUrl(getShell(), currentUrl);
-          if(scmUrl != null) {
-            scmUrlCombo.setText(scmUrl.getProviderUrl());
-            if(scmUrls == null) {
-              scmUrls = new ScmUrl[1];
-            }
-            scmUrls[0] = scmUrl;
-            scmParentUrl = scmUrl.getUrl();
-            updatePage();
-          }
-        }
-      });
-
-      scmUrlCombo.addModifyListener(new ModifyListener() {
-        public void modifyText(ModifyEvent e) {
-          final String url = scmUrlCombo.getText().trim();
-          if(url.startsWith("scm:")) { //$NON-NLS-1$
-            try {
-              final String type = ScmUrl.getType(url);
-              scmTypeCombo.setText(type);
-              scmType = type;
-              Display.getDefault().asyncExec(new Runnable() {
-                public void run() {
-                  scmUrlCombo.setText(url.substring(type.length() + 5));
-                }
-              });
-            } catch(CoreException ex) {
-            }
-            return;
-          }
-
+      scmUrlBrowseButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+        ScmHandlerUi handlerUi = ScmHandlerFactory.getHandlerUiByType(scmType);
+        // XXX should use null if there is no scmUrl selected
+        ScmUrl currentUrl = scmUrls == null || scmUrls.length == 0 ? new ScmUrl("scm:" + scmType + ":") : scmUrls[0]; //$NON-NLS-1$ //$NON-NLS-2$
+        ScmUrl scmUrl = handlerUi.selectUrl(getShell(), currentUrl);
+        if(scmUrl != null) {
+          scmUrlCombo.setText(scmUrl.getProviderUrl());
           if(scmUrls == null) {
             scmUrls = new ScmUrl[1];
           }
-
-          ScmUrl scmUrl = new ScmUrl("scm:" + scmType + ":" + url); //$NON-NLS-1$ //$NON-NLS-2$
           scmUrls[0] = scmUrl;
           scmParentUrl = scmUrl.getUrl();
           updatePage();
         }
+      }));
+
+      scmUrlCombo.addModifyListener(e -> {
+        final String url = scmUrlCombo.getText().trim();
+        if(url.startsWith("scm:")) { //$NON-NLS-1$
+          try {
+            final String type = ScmUrl.getType(url);
+            scmTypeCombo.setText(type);
+            scmType = type;
+            Display.getDefault().asyncExec(() -> scmUrlCombo.setText(url.substring(type.length() + 5)));
+          } catch(CoreException ex) {
+          }
+          return;
+        }
+
+        if(scmUrls == null) {
+          scmUrls = new ScmUrl[1];
+        }
+
+        ScmUrl scmUrl = new ScmUrl("scm:" + scmType + ":" + url); //$NON-NLS-1$ //$NON-NLS-2$
+        scmUrls[0] = scmUrl;
+        scmParentUrl = scmUrl.getUrl();
+        updatePage();
       });
     }
     if(Platform.getBundle("org.eclipse.m2e.discovery") != null) {
@@ -286,8 +262,8 @@ public class MavenCheckoutLocationPage extends AbstractMavenWizardPage {
               for(IConfigurationElement element : extension[0].getConfigurationElements()) {
                 if(element.getName().equals("launcher")) {
                   try {
-                    ((IMavenDiscovery) element.createExecutableExtension("class")).launch(Display.getCurrent()
-                        .getActiveShell());
+                    ((IMavenDiscovery) element.createExecutableExtension("class"))
+                        .launch(Display.getCurrent().getActiveShell());
                     break;
                   } catch(CoreException e1) {
                     //
@@ -478,12 +454,10 @@ public class MavenCheckoutLocationPage extends AbstractMavenWizardPage {
   }
 
   public void addListener(final SelectionListener listener) {
-    ModifyListener listenerProxy = new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        Event event = new Event();
-        event.widget = e.widget;
-        listener.widgetSelected(new SelectionEvent(event));
-      }
+    ModifyListener listenerProxy = e -> {
+      Event event = new Event();
+      event.widget = e.widget;
+      listener.widgetSelected(new SelectionEvent(event));
     };
     scmUrlCombo.addModifyListener(listenerProxy);
     revisionText.addModifyListener(listenerProxy);

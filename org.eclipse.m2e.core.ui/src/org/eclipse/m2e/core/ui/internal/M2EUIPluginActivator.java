@@ -1,9 +1,11 @@
 /*******************************************************************************
- * Copyright (c) 2008-2018 Sonatype, Inc. and others
+ * Copyright (c) 2008, 2019 Sonatype, Inc. and others
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -24,6 +26,7 @@ import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.ImageRegistry;
+import org.eclipse.jface.resource.ResourceLocator;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
@@ -103,14 +106,14 @@ public class M2EUIPluginActivator extends AbstractUIPlugin {
     ImageRegistry registry = getDefault().getImageRegistry();
     Image image = registry.get(path);
     if(image == null) {
-      registry.put(path, imageDescriptorFromPlugin(IMavenConstants.PLUGIN_ID, path));
+      registry.put(path, ResourceLocator.imageDescriptorFromBundle(IMavenConstants.PLUGIN_ID, path).get());
       image = registry.get(path);
     }
     return image;
   }
 
   public static ImageDescriptor getImageDescriptor(String path) {
-    return imageDescriptorFromPlugin(IMavenConstants.PLUGIN_ID, path);
+    return ResourceLocator.imageDescriptorFromBundle(IMavenConstants.PLUGIN_ID, path).get();
   }
 
   public synchronized MavenConsoleImpl getMavenConsole() {

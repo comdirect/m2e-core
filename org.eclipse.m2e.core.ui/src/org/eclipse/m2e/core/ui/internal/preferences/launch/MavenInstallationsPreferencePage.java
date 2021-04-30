@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -16,22 +18,17 @@ import java.util.List;
 import java.util.Set;
 
 import org.eclipse.jface.preference.PreferencePage;
-import org.eclipse.jface.viewers.CheckStateChangedEvent;
 import org.eclipse.jface.viewers.CheckboxTableViewer;
-import org.eclipse.jface.viewers.ICheckStateListener;
 import org.eclipse.jface.viewers.IColorProvider;
 import org.eclipse.jface.viewers.ILabelProviderListener;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredContentProvider;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITableLabelProvider;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.window.Window;
 import org.eclipse.jface.wizard.WizardDialog;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
@@ -209,67 +206,55 @@ public class MavenInstallationsPreferencePage extends PreferencePage implements 
     Button addButton = new Button(composite, SWT.NONE);
     addButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     addButton.setText(Messages.MavenInstallationsPreferencePage_btnAdd);
-    addButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        MavenInstallationWizard wizard = new MavenInstallationWizard(getForbiddenNames(null));
-        WizardDialog dialog = new WizardDialog(getShell(), wizard);
-        if(dialog.open() == Window.OK) {
-          runtimes.add(wizard.getResult());
-          refreshRuntimesViewer();
-        }
+    addButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      MavenInstallationWizard wizard = new MavenInstallationWizard(getForbiddenNames(null));
+      WizardDialog dialog = new WizardDialog(getShell(), wizard);
+      if(dialog.open() == Window.OK) {
+        runtimes.add(wizard.getResult());
+        refreshRuntimesViewer();
       }
-    });
+    }));
 
     final Button editButton = new Button(composite, SWT.NONE);
     editButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     editButton.setEnabled(false);
     editButton.setText(Messages.MavenInstallationsPreferencePage_btnEdit);
-    editButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        AbstractMavenRuntime runtime = getSelectedMavenRuntime();
-        MavenInstallationWizard wizard = new MavenInstallationWizard(runtime, getForbiddenNames(runtime));
-        WizardDialog dialog = new WizardDialog(getShell(), wizard);
-        if(dialog.open() == Window.OK) {
-          AbstractMavenRuntime updatedRuntime = wizard.getResult();
-          for(int i = 0; i < runtimes.size(); i++ ) {
-            if(runtime == runtimes.get(i)) {
-              runtimes.set(i, updatedRuntime);
-              break;
-            }
+    editButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      AbstractMavenRuntime runtime = getSelectedMavenRuntime();
+      MavenInstallationWizard wizard = new MavenInstallationWizard(runtime, getForbiddenNames(runtime));
+      WizardDialog dialog = new WizardDialog(getShell(), wizard);
+      if(dialog.open() == Window.OK) {
+        AbstractMavenRuntime updatedRuntime = wizard.getResult();
+        for(int i = 0; i < runtimes.size(); i++ ) {
+          if(runtime == runtimes.get(i)) {
+            runtimes.set(i, updatedRuntime);
+            break;
           }
-          refreshRuntimesViewer();
         }
+        refreshRuntimesViewer();
       }
-    });
+    }));
 
     final Button removeButton = new Button(composite, SWT.NONE);
     removeButton.setEnabled(false);
     removeButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     removeButton.setText(Messages.MavenInstallationsPreferencePage_btnRemove);
-    removeButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
+    removeButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      AbstractMavenRuntime runtime = getSelectedMavenRuntime();
+      runtimes.remove(runtime);
+      refreshRuntimesViewer();
+    }));
+
+    runtimesViewer.addSelectionChangedListener(event -> {
+      if(runtimesViewer.getSelection() instanceof IStructuredSelection) {
         AbstractMavenRuntime runtime = getSelectedMavenRuntime();
-        runtimes.remove(runtime);
-        refreshRuntimesViewer();
+        boolean isEnabled = runtime != null && runtime.isEditable();
+        removeButton.setEnabled(isEnabled);
+        editButton.setEnabled(isEnabled);
       }
     });
 
-    runtimesViewer.addSelectionChangedListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent event) {
-        if(runtimesViewer.getSelection() instanceof IStructuredSelection) {
-          AbstractMavenRuntime runtime = getSelectedMavenRuntime();
-          boolean isEnabled = runtime != null && runtime.isEditable();
-          removeButton.setEnabled(isEnabled);
-          editButton.setEnabled(isEnabled);
-        }
-      }
-    });
-
-    runtimesViewer.addCheckStateListener(new ICheckStateListener() {
-      public void checkStateChanged(CheckStateChangedEvent event) {
-        setCheckedRuntime((AbstractMavenRuntime) event.getElement());
-      }
-    });
+    runtimesViewer.addCheckStateListener(event -> setCheckedRuntime((AbstractMavenRuntime) event.getElement()));
     Label noteLabel = new Label(composite, SWT.WRAP);
     GridData noteLabelData = new GridData(SWT.FILL, SWT.TOP, false, false, 2, 1);
     noteLabelData.widthHint = 100;

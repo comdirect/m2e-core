@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -12,9 +14,11 @@
 /*******************************************************************************
  * Copyright (c) 2008 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
 
 package org.eclipse.m2e.jdt;
@@ -111,8 +115,11 @@ public class MavenJdtPlugin extends Plugin {
     workspaceSourceDownloadJob = new WorkspaceSourceDownloadJob();
 
     mavenConfiguration.addConfigurationChangeListener(new AbstractMavenConfigurationChangeListener() {
+      @SuppressWarnings("static-access")
       public void mavenConfigurationChange(MavenConfigurationChangeEvent event) {
         String key = event.getKey();
+
+        // use those constants from the event class is to have an overview of supported event keys
         if((MavenConfigurationChangeEvent.P_DOWNLOAD_JAVADOC.equals(key) && mavenConfiguration.isDownloadJavaDoc())
             || (MavenConfigurationChangeEvent.P_DOWNLOAD_SOURCES.equals(key)
                 && mavenConfiguration.isDownloadSources())) {

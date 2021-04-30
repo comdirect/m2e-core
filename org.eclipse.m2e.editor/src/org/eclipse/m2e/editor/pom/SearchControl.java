@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -13,10 +15,7 @@ package org.eclipse.m2e.editor.pom;
 
 import org.eclipse.jface.action.ControlContribution;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
@@ -90,17 +89,9 @@ public class SearchControl extends ControlContribution {
     clearToolItem.setEnabled(false);
     clearToolItem.setImage(MavenEditorImages.IMG_CLEAR);
     clearToolItem.setDisabledImage(MavenEditorImages.IMG_CLEAR_DISABLED);
-    clearToolItem.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        searchText.setText(""); //$NON-NLS-1$
-      }
-    });
+    clearToolItem.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> searchText.setText("")));
 
-    searchText.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        clearToolItem.setEnabled(searchText.getText().length() > 0);
-      }
-    });
+    searchText.addModifyListener(e -> clearToolItem.setEnabled(searchText.getText().length() > 0));
 
     toolkit.paintBordersFor(composite);
 

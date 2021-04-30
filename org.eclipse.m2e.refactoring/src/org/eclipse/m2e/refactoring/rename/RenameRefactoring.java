@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -44,7 +46,6 @@ import org.eclipse.m2e.refactoring.RefactoringModelResources.PropertyInfo;
  */
 @SuppressWarnings("rawtypes")
 public class RenameRefactoring extends AbstractPomRefactoring {
-  private static final Object[] EMPTY_OBJECT_ARRAY = new Object[] {};
 
   private static final String VERSION = "version"; //$NON-NLS-1$
 
@@ -83,14 +84,14 @@ public class RenameRefactoring extends AbstractPomRefactoring {
     String getterName = "get" + current.element; //$NON-NLS-1$
 
     try {
-      Method getter = root.getClass().getMethod(getterName, new Class[] {});
-      root = getElement(getter.invoke(root, EMPTY_OBJECT_ARRAY), path);
+      Method getter = root.getClass().getMethod(getterName);
+      root = getElement(getter.invoke(root), path);
       if(root instanceof List) {
         List children = (List) root;
         for(int i = 0; i < children.size(); i++ ) {
           Object child = children.get(i);
-          Method artifact = child.getClass().getMethod(GETARTIFACT_ID, new Class[] {});
-          String artifactId = (String) artifact.invoke(child, EMPTY_OBJECT_ARRAY);
+          Method artifact = child.getClass().getMethod(GETARTIFACT_ID);
+          String artifactId = (String) artifact.invoke(child);
           if(current.artifactId != null && !current.artifactId.equals(artifactId))
             continue;
 
@@ -111,7 +112,7 @@ public class RenameRefactoring extends AbstractPomRefactoring {
    */
   private List<EObjectWithPath> scanModel(Model model, String groupId, String artifactId, String version,
       boolean processRoot) {
-    List<EObjectWithPath> res = new ArrayList<EObjectWithPath>();
+    List<EObjectWithPath> res = new ArrayList<>();
     Path path = new Path();
     if(processRoot) {
       scanObject(path, model, groupId, artifactId, version, res);
@@ -122,8 +123,8 @@ public class RenameRefactoring extends AbstractPomRefactoring {
   }
 
   // add candidate objects with same artifactId
-  private List<EObjectWithPath> scanObject(Path current, EObject obj, String groupId, String artifactId,
-      String version, List<EObjectWithPath> res) {
+  private List<EObjectWithPath> scanObject(Path current, EObject obj, String groupId, String artifactId, String version,
+      List<EObjectWithPath> res) {
     if(scanFeature(obj, ARTIFACT_ID, artifactId)) {
       // System.out.println("found object " + obj + " : " + current);
       res.add(new EObjectWithPath(obj, current));
@@ -170,6 +171,7 @@ public class RenameRefactoring extends AbstractPomRefactoring {
     return obj.eGet(feature) == null ? null : obj.eGet(feature).toString();
   }
 
+  @Override
   public String getNewProjectName() {
     return page.getRenameEclipseProject() ? page.getNewArtifactId() : null;
   }
@@ -198,10 +200,10 @@ public class RenameRefactoring extends AbstractPomRefactoring {
         // System.out.println("cannot find effective for: " + obj.object);
         continue;
       }
-      Method method = effectiveObj.getClass().getMethod(GETVERSION, new Class[] {});
-      String effectiveVersion = (String) method.invoke(effectiveObj, EMPTY_OBJECT_ARRAY);
-      method = effectiveObj.getClass().getMethod(GETGROUP_ID, new Class[] {});
-      String effectiveGroupId = (String) method.invoke(effectiveObj, EMPTY_OBJECT_ARRAY);
+      Method method = effectiveObj.getClass().getMethod(GETVERSION);
+      String effectiveVersion = (String) method.invoke(effectiveObj);
+      method = effectiveObj.getClass().getMethod(GETGROUP_ID);
+      String effectiveGroupId = (String) method.invoke(effectiveObj);
       // if version from effective POM is different from old version, skip it
       if(this.oldVersion != null && !this.oldVersion.equals(effectiveVersion)) {
         continue;
@@ -234,8 +236,8 @@ public class RenameRefactoring extends AbstractPomRefactoring {
       info = model.getProperties().get(pName);
     }
     if(info != null)
-      info.setNewValue(new SetCommand(editingDomain, info.getPair(), info.getPair().eClass()
-          .getEStructuralFeature("value"), newValue)); //$NON-NLS-1$
+      info.setNewValue(new SetCommand(editingDomain, info.getPair(),
+          info.getPair().eClass().getEStructuralFeature("value"), newValue)); //$NON-NLS-1$
     else
       applyObject(editingDomain, command, obj.object, feature, newValue);
   }
@@ -254,7 +256,8 @@ public class RenameRefactoring extends AbstractPomRefactoring {
   }
 
   @Override
-  public RefactoringStatus checkInitialConditions(IProgressMonitor pm) throws CoreException, OperationCanceledException {
+  public RefactoringStatus checkInitialConditions(IProgressMonitor pm)
+      throws CoreException, OperationCanceledException {
     PomResourceImpl resource = AbstractPomRefactoring.loadResource(file);
     try {
       Model model = (Model) resource.getContents().get(0);
@@ -275,31 +278,30 @@ public class RenameRefactoring extends AbstractPomRefactoring {
 
   @Override
   public PomVisitor getVisitor() {
-    return new PomVisitor() {
-
-      public CompoundCommand applyChanges(RefactoringModelResources current, IProgressMonitor pm) throws Exception {
-        //process <project> element only for the refactored file itself
-        boolean processRoot = current.getPomFile().equals(file);
-        return RenameRefactoring.this.applyModel(current, page.getNewGroupId(), page.getNewArtifactId(),
-            page.getNewVersion(), processRoot);
-      }
+    return (current, pm) -> {
+      //process <project> element only for the refactored file itself
+      boolean processRoot = current.getPomFile().equals(file);
+      return RenameRefactoring.this.applyModel(current, page.getNewGroupId(), page.getNewArtifactId(),
+          page.getNewVersion(), processRoot);
     };
   }
 
   static class Path {
-    List<PathElement> path = new ArrayList<PathElement>();
+    List<PathElement> path = new ArrayList<>();
 
     public void addElement(String element, String artifactId) {
       path.add(new PathElement(element, artifactId));
     }
 
+    @Override
     public String toString() {
       return path.toString();
     }
 
+    @Override
     public Path clone() {
       Path res = new Path();
-      res.path = new ArrayList<PathElement>(this.path);
+      res.path = new ArrayList<>(this.path);
       return res;
     }
   }
@@ -315,6 +317,7 @@ public class RenameRefactoring extends AbstractPomRefactoring {
       this.artifactId = artifactId;
     }
 
+    @Override
     public String toString() {
       return "/" + element + "[artifactId=" + artifactId + "]"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
     }
@@ -337,10 +340,12 @@ public class RenameRefactoring extends AbstractPomRefactoring {
     public boolean interested(EObject obj);
   }
 
+  @Override
   public boolean scanAllArtifacts() {
     return true;
   }
 
+  @Override
   public String getTitle() {
     return NLS.bind(Messages.RenameRefactoring_title, file.getParent().getName());
   }

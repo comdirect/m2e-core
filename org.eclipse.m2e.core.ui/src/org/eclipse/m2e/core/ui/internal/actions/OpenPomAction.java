@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2018 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -112,34 +114,21 @@ public class OpenPomAction extends ActionDelegate implements IWorkbenchWindowAct
     return mavenProject;
   }
 
-  /* (non-Javadoc)
-   * @see org.eclipse.ui.actions.ActionDelegate#run(org.eclipse.jface.action.IAction)
-   */
   public void run(IAction action) {
     //TODO mkleint: this asks for rewrite.. having one action that does 2 quite different things based
     // on something as vague as selection passed in is unreadable..
     if(selection != null) {
       Object element = this.selection.getFirstElement();
       if(IIndex.SEARCH_ARTIFACT.equals(type) && element != null) {
-        try {
-          final ArtifactKey ak = SelectionUtil.getArtifactKey(element);
-          if(ak != null) {
-            new Job(Messages.OpenPomAction_job_opening) {
-              protected IStatus run(IProgressMonitor monitor) {
-                openEditor(ak.getGroupId(), ak.getArtifactId(), ak.getVersion(), getMavenProject(), monitor);
-                return Status.OK_STATUS;
-              }
-            }.schedule();
-            return;
-          }
-        } catch(CoreException ex) {
-          log.error(ex.getMessage(), ex);
-          PlatformUI.getWorkbench().getDisplay().asyncExec(new Runnable() {
-            public void run() {
-              MessageDialog.openInformation(Display.getDefault().getActiveShell(), //
-                  Messages.OpenPomAction_open_error_title, Messages.OpenPomAction_open_error_message);
+        final ArtifactKey ak = SelectionUtil.getArtifactKey(element);
+        if(ak != null) {
+          new Job(Messages.OpenPomAction_job_opening) {
+            protected IStatus run(IProgressMonitor monitor) {
+              openEditor(ak.getGroupId(), ak.getArtifactId(), ak.getVersion(), getMavenProject(), monitor);
+              return Status.OK_STATUS;
             }
-          });
+          }.schedule();
+          return;
         }
       }
     }
@@ -269,21 +258,19 @@ public class OpenPomAction extends ActionDelegate implements IWorkbenchWindowAct
 
   public IEditorPart openPomEditor(final IEditorInput editorInput, final String name) {
     final IEditorPart[] part = new IEditorPart[1];
-    PlatformUI.getWorkbench().getDisplay().syncExec(new Runnable() {
-      public void run() {
-        IContentTypeManager contentTypeManager = Platform.getContentTypeManager();
-        IContentType contentType = contentTypeManager.findContentTypeFor(name);
-        IEditorRegistry editorRegistry = PlatformUI.getWorkbench().getEditorRegistry();
-        IEditorDescriptor editor = editorRegistry.getDefaultEditor(name, contentType);
-        IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
-        if(window != null) {
-          IWorkbenchPage page = window.getActivePage();
-          if(page != null) {
-            try {
-              part[0] = page.openEditor(editorInput, editor.getId());
-            } catch(PartInitException ex) {
-              openDialog(NLS.bind(Messages.OpenPomAction_33, editorInput.getName(), ex.toString()));
-            }
+    PlatformUI.getWorkbench().getDisplay().syncExec(() -> {
+      IContentTypeManager contentTypeManager = Platform.getContentTypeManager();
+      IContentType contentType = contentTypeManager.findContentTypeFor(name);
+      IEditorRegistry editorRegistry = PlatformUI.getWorkbench().getEditorRegistry();
+      IEditorDescriptor editor = editorRegistry.getDefaultEditor(name, contentType);
+      IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
+      if(window != null) {
+        IWorkbenchPage page = window.getActivePage();
+        if(page != null) {
+          try {
+            part[0] = page.openEditor(editorInput, editor.getId());
+          } catch(PartInitException ex) {
+            openDialog(NLS.bind(Messages.OpenPomAction_33, editorInput.getName(), ex.toString()));
           }
         }
       }
@@ -292,12 +279,8 @@ public class OpenPomAction extends ActionDelegate implements IWorkbenchWindowAct
   }
 
   protected void openDialog(final String msg) {
-    Runnable r = new Runnable() {
-      public void run() {
-        MessageDialog.openInformation(Display.getDefault().getActiveShell(), //
-            Messages.OpenPomAction_open_title, msg);
-      }
-    };
+    Runnable r = () -> MessageDialog.openInformation(Display.getDefault().getActiveShell(), //
+        Messages.OpenPomAction_open_title, msg);
     Display display = PlatformUI.getWorkbench().getDisplay();
     if(display == Display.getCurrent()) {
       r.run();

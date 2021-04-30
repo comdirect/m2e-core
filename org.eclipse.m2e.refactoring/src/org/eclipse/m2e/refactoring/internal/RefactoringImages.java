@@ -1,9 +1,11 @@
 /*******************************************************************************
- * Copyright (c) 2008-2010 Sonatype, Inc.
+ * Copyright (c) 2008, 2019 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -16,7 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.ImageRegistry;
-import org.eclipse.ui.plugin.AbstractUIPlugin;
+import org.eclipse.jface.resource.ResourceLocator;
 
 
 /**
@@ -59,7 +61,7 @@ public class RefactoringImages {
   }
 
   private static ImageDescriptor createDescriptor(String image) {
-    return AbstractUIPlugin.imageDescriptorFromPlugin(Activator.PLUGIN_ID, "icons/" + image); //$NON-NLS-1$
+    return ResourceLocator.imageDescriptorFromBundle(Activator.PLUGIN_ID, "icons/" + image).get(); //$NON-NLS-1$
   }
 
 }

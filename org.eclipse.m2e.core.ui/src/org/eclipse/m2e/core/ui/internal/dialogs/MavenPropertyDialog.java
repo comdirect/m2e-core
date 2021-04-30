@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -15,8 +17,6 @@ package org.eclipse.m2e.core.ui.internal.dialogs;
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.dialogs.IDialogConstants;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.VerifyEvent;
 import org.eclipse.swt.events.VerifyListener;
 import org.eclipse.swt.layout.GridData;
@@ -78,11 +78,7 @@ public class MavenPropertyDialog extends Dialog {
     nameText.setLayoutData(gd);
     nameText.setFont(comp.getFont());
     nameText.setText(initialName == null ? "" : initialName); //$NON-NLS-1$
-    nameText.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        updateButtons();
-      }
-    });
+    nameText.addModifyListener(e -> updateButtons());
 
     Label valueLabel = new Label(comp, SWT.NONE);
     valueLabel.setText(Messages.launchPropertyDialogValue);
@@ -94,11 +90,7 @@ public class MavenPropertyDialog extends Dialog {
     valueText.setLayoutData(gd);
     valueText.setFont(comp.getFont());
     valueText.setText(initialValue == null ? "" : initialValue); //$NON-NLS-1$
-    valueText.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        updateButtons();
-      }
-    });
+    valueText.addModifyListener(e -> updateButtons());
 
 //    if(variables) {
 //      Button variablesButton = new Button(comp, SWT.PUSH);

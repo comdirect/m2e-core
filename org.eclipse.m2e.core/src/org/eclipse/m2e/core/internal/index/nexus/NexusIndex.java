@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -105,7 +107,7 @@ public class NexusIndex implements IIndex, IMutableIndex {
   public Collection<IndexedArtifact> find(Collection<SearchExpression> groupId,
       Collection<SearchExpression> artifactId, Collection<SearchExpression> version,
       Collection<SearchExpression> packaging) throws CoreException {
-    BooleanQuery query = new BooleanQuery();
+    BooleanQuery.Builder query = new BooleanQuery.Builder();
 
     addQueryFromSearchExpressionCollection(query, MAVEN.PACKAGING, packaging);
 
@@ -115,18 +117,18 @@ public class NexusIndex implements IIndex, IMutableIndex {
 
     addQueryFromSearchExpressionCollection(query, MAVEN.VERSION, version);
 
-    return indexManager.search(repository, query).values();
+    return indexManager.search(repository, query.build()).values();
   }
 
-  private void addQueryFromSearchExpressionCollection(final BooleanQuery query, final Field field,
+  private void addQueryFromSearchExpressionCollection(final BooleanQuery.Builder query, final Field field,
       final Collection<SearchExpression> sec) {
     if(sec != null && !sec.isEmpty()) {
       if(sec.size() > 1) {
-        BooleanQuery q = new BooleanQuery();
+        BooleanQuery.Builder q = new BooleanQuery.Builder();
         for(SearchExpression se : sec) {
           q.add(indexManager.constructQuery(field, se), Occur.SHOULD);
         }
-        query.add(q, Occur.MUST);
+        query.add(q.build(), Occur.MUST);
       } else {
         query.add(indexManager.constructQuery(field, sec.iterator().next()), Occur.MUST);
       }

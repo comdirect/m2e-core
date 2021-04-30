@@ -1,9 +1,11 @@
 /*******************************************************************************
- * Copyright (c) 2008-2013 Sonatype, Inc. and others.
+ * Copyright (c) 2008, 2019 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -62,9 +64,9 @@ public class MavenDiscovery {
 
   private static final Tag MAVEN_TAG = new Tag("maven", Messages.MavenDiscovery_Wizard_MavenTag); //$NON-NLS-1$
 
-  private static final String DEFAULT_BASEURL = "http://download.eclipse.org/technology/m2e/discovery/"; //$NON-NLS-1$
+  private static final String DEFAULT_BASEURL = "https://download.eclipse.org/technology/m2e/discovery/"; //$NON-NLS-1$
 
-  private static final String DEFAULT_FILENAME = "directory-1.12.xml"; //$NON-NLS-1$
+  private static final String DEFAULT_FILENAME = "directory-1.15.xml"; //$NON-NLS-1$
 
   public static final String DEFAULT_URL = DEFAULT_BASEURL + DEFAULT_FILENAME;
 
@@ -84,19 +86,16 @@ public class MavenDiscovery {
     PATH = CONFIGURED_URL != null ? CONFIGURED_URL : BASEURL + DEFAULT_FILENAME;
   }
 
-  @SuppressWarnings("unchecked")
   public static void launchWizard(Shell shell) {
-    launchWizard(shell, Collections.EMPTY_LIST, Collections.EMPTY_LIST, Collections.EMPTY_LIST, Collections.EMPTY_LIST);
+    launchWizard(shell, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+        Collections.emptyList());
   }
 
   public static void launchWizard(final Collection<String> packagingTypes, final Collection<MojoExecutionKey> mojos,
       final Collection<String> lifecycleIds, final Collection<String> configuratorIds) {
     final Display display = Workbench.getInstance().getDisplay();
-    display.asyncExec(new Runnable() {
-      public void run() {
-        launchWizard(display.getActiveShell(), packagingTypes, mojos, lifecycleIds, configuratorIds);
-      }
-    });
+    display
+        .asyncExec(() -> launchWizard(display.getActiveShell(), packagingTypes, mojos, lifecycleIds, configuratorIds));
   }
 
   public static void launchWizard(Shell shell, Collection<String> packagingTypes, Collection<MojoExecutionKey> mojos,

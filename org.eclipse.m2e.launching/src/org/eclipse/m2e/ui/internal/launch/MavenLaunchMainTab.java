@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2014 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -30,10 +32,6 @@ import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.ui.AbstractLaunchConfigurationTab;
 import org.eclipse.debug.ui.StringVariableSelectionDialog;
 import org.eclipse.jface.dialogs.IDialogConstants;
-import org.eclipse.jface.viewers.DoubleClickEvent;
-import org.eclipse.jface.viewers.IDoubleClickListener;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.FocusAdapter;
@@ -314,30 +312,24 @@ public class MavenLaunchMainTab extends AbstractLaunchConfigurationTab implement
     new Label(mainComposite, SWT.NONE);
 
     TableViewer tableViewer = new TableViewer(mainComposite, SWT.BORDER | SWT.FULL_SELECTION | SWT.MULTI);
-    tableViewer.addDoubleClickListener(new IDoubleClickListener() {
-      public void doubleClick(DoubleClickEvent event) {
-        TableItem[] selection = propsTable.getSelection();
-        if(selection.length == 1) {
-          editProperty(selection[0].getText(0), selection[0].getText(1));
-        }
+    tableViewer.addDoubleClickListener(event -> {
+      TableItem[] selection = propsTable.getSelection();
+      if(selection.length == 1) {
+        editProperty(selection[0].getText(0), selection[0].getText(1));
       }
     });
-    tableViewer.addSelectionChangedListener(new ISelectionChangedListener() {
-
-      public void selectionChanged(SelectionChangedEvent event) {
-        TableItem[] items = propsTable.getSelection();
-        if(items == null || items.length == 0) {
-          editPropButton.setEnabled(false);
-          removePropButton.setEnabled(false);
-        } else if(items.length == 1) {
-          editPropButton.setEnabled(true);
-          removePropButton.setEnabled(true);
-        } else {
-          editPropButton.setEnabled(false);
-          removePropButton.setEnabled(true);
-        }
+    tableViewer.addSelectionChangedListener(event -> {
+      TableItem[] items = propsTable.getSelection();
+      if(items == null || items.length == 0) {
+        editPropButton.setEnabled(false);
+        removePropButton.setEnabled(false);
+      } else if(items.length == 1) {
+        editPropButton.setEnabled(true);
+        removePropButton.setEnabled(true);
+      } else {
+        editPropButton.setEnabled(false);
+        removePropButton.setEnabled(true);
       }
-
     });
 
     this.propsTable = tableViewer.getTable();
@@ -357,11 +349,7 @@ public class MavenLaunchMainTab extends AbstractLaunchConfigurationTab implement
     final Button addPropButton = new Button(mainComposite, SWT.NONE);
     addPropButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     addPropButton.setText(Messages.launchPropAddButton); //$NON-NLS-1$
-    addPropButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        addProperty();
-      }
-    });
+    addPropButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> addProperty()));
     editPropButton = new Button(mainComposite, SWT.NONE);
     editPropButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     editPropButton.setText(Messages.launchPropEditButton); //$NON-NLS-1$
@@ -379,14 +367,12 @@ public class MavenLaunchMainTab extends AbstractLaunchConfigurationTab implement
     removePropButton = new Button(mainComposite, SWT.NONE);
     removePropButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     removePropButton.setText(Messages.launchPropRemoveButton); //$NON-NLS-1$
-    removePropButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        if(propsTable.getSelectionCount() > 0) {
-          propsTable.remove(propsTable.getSelectionIndices());
-          entriesChanged();
-        }
+    removePropButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      if(propsTable.getSelectionCount() > 0) {
+        propsTable.remove(propsTable.getSelectionIndices());
+        entriesChanged();
       }
-    });
+    }));
     removePropButton.setEnabled(false);
 
     Label mavenRuntimeLabel = new Label(mainComposite, SWT.NONE);
@@ -395,11 +381,7 @@ public class MavenLaunchMainTab extends AbstractLaunchConfigurationTab implement
 
     runtimeSelector = new MavenRuntimeSelector(mainComposite);
     runtimeSelector.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 4, 1));
-    runtimeSelector.addSelectionChangedListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent event) {
-        entriesChanged();
-      }
-    });
+    runtimeSelector.addSelectionChangedListener(event -> entriesChanged());
 
     goalsText.setFocus();
   }
@@ -444,17 +426,15 @@ public class MavenLaunchMainTab extends AbstractLaunchConfigurationTab implement
         variablesButton.setFont(comp.getFont());
         variablesButton.setText(Messages.launchPropertyDialogBrowseVariables); //$NON-NLS-1$;
 
-        variablesButton.addSelectionListener(new SelectionAdapter() {
-          public void widgetSelected(SelectionEvent se) {
-            StringVariableSelectionDialog variablesDialog = new StringVariableSelectionDialog(getShell());
-            if(variablesDialog.open() == IDialogConstants.OK_ID) {
-              String variable = variablesDialog.getVariableExpression();
-              if(variable != null) {
-                valueText.insert(variable.trim());
-              }
+        variablesButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+          StringVariableSelectionDialog variablesDialog = new StringVariableSelectionDialog(getShell());
+          if(variablesDialog.open() == IDialogConstants.OK_ID) {
+            String variable = variablesDialog.getVariableExpression();
+            if(variable != null) {
+              valueText.insert(variable.trim());
             }
           }
-        });
+        }));
 
         return comp;
       }
@@ -472,8 +452,8 @@ public class MavenLaunchMainTab extends AbstractLaunchConfigurationTab implement
       IMavenConfiguration mavenConfiguration = MavenPlugin.getMavenConfiguration();
 
       this.offlineButton.setSelection(getAttribute(configuration, ATTR_OFFLINE, mavenConfiguration.isOffline()));
-      this.debugOutputButton.setSelection(getAttribute(configuration, ATTR_DEBUG_OUTPUT,
-          mavenConfiguration.isDebugOutput()));
+      this.debugOutputButton
+          .setSelection(getAttribute(configuration, ATTR_DEBUG_OUTPUT, mavenConfiguration.isDebugOutput()));
 
       this.updateSnapshotsButton.setSelection(getAttribute(configuration, ATTR_UPDATE_SNAPSHOTS, false));
       this.skipTestsButton.setSelection(getAttribute(configuration, ATTR_SKIP_TESTS, false));
@@ -489,8 +469,7 @@ public class MavenLaunchMainTab extends AbstractLaunchConfigurationTab implement
 
       this.propsTable.removeAll();
 
-      @SuppressWarnings("unchecked")
-      List<String> properties = configuration.getAttribute(ATTR_PROPERTIES, Collections.EMPTY_LIST);
+      List<String> properties = configuration.getAttribute(ATTR_PROPERTIES, Collections.emptyList());
       for(String property : properties) {
         int n = property.indexOf('=');
         String name = property;

@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2018 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -24,18 +26,15 @@ import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.resource.LocalResourceManager;
 import org.eclipse.jface.resource.ResourceManager;
 import org.eclipse.jface.viewers.ComboViewer;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredContentProvider;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.LabelProvider;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerComparator;
 import org.eclipse.jface.window.Window;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Button;
@@ -168,17 +167,15 @@ public class WorkingSetGroup {
     newWorkingSetButton.setData("name", "configureButton"); //$NON-NLS-1$ //$NON-NLS-2$
     newWorkingSetButton.setText(Messages.WorkingSetGroup_btnMore);
     newWorkingSetButton.setEnabled(false);
-    newWorkingSetButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(final SelectionEvent e) {
-        IWorkingSetManager workingSetManager = PlatformUI.getWorkbench().getWorkingSetManager();
-        IWorkingSetSelectionDialog dialog = workingSetManager.createWorkingSetSelectionDialog(shell, true,
-            WORKING_SET_IDS.toArray(new String[0]));
-        if(dialog.open() == Window.OK) {
-          IWorkingSet[] workingSets = dialog.getSelection();
-          selectWorkingSets(Arrays.asList(workingSets));
-        }
+    newWorkingSetButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      IWorkingSetManager workingSetManager = PlatformUI.getWorkbench().getWorkingSetManager();
+      IWorkingSetSelectionDialog dialog = workingSetManager.createWorkingSetSelectionDialog(shell, true,
+          WORKING_SET_IDS.toArray(new String[0]));
+      if(dialog.open() == Window.OK) {
+        IWorkingSet[] workingSets = dialog.getSelection();
+        selectWorkingSets(Arrays.asList(workingSets));
       }
-    });
+    }));
 
     if(selectWorkingSets(workingSets)) {
       addToWorkingSetButton.setSelection(true);
@@ -187,25 +184,19 @@ public class WorkingSetGroup {
       newWorkingSetButton.setEnabled(true);
     }
 
-    addToWorkingSetButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        boolean addToWorkingingSet = addToWorkingSetButton.getSelection();
-        workingsetLabel.setEnabled(addToWorkingingSet);
-        workingsetComboViewer.getCombo().setEnabled(addToWorkingingSet);
-        newWorkingSetButton.setEnabled(addToWorkingingSet);
-        if(addToWorkingingSet) {
-          updateConfiguration();
-        } else {
-          workingSets.clear();
-        }
-      }
-    });
-
-    workingsetComboViewer.addSelectionChangedListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent event) {
+    addToWorkingSetButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      boolean addToWorkingingSet = addToWorkingSetButton.getSelection();
+      workingsetLabel.setEnabled(addToWorkingingSet);
+      workingsetComboViewer.getCombo().setEnabled(addToWorkingingSet);
+      newWorkingSetButton.setEnabled(addToWorkingingSet);
+      if(addToWorkingingSet) {
         updateConfiguration();
+      } else {
+        workingSets.clear();
       }
-    });
+    }));
+
+    workingsetComboViewer.addSelectionChangedListener(event -> updateConfiguration());
   }
 
   protected void updateConfiguration() {

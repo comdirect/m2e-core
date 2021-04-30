@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2015 Sonatype, Inc. and others
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -83,18 +85,15 @@ public class LifecycleMappingResolution extends AbstractLifecycleMappingResoluti
 
   private void performIgnore(List<IMarker> markers) throws IOException, CoreException {
     final IFile[] pomFile = new IFile[1];
-    PlatformUI.getWorkbench().getDisplay().syncExec(new Runnable() {
-
-      public void run() {
-        LifecycleMappingDialog dialog = new LifecycleMappingDialog(Display.getCurrent().getActiveShell(),
-            (IFile) getMarker().getResource(), getMarker().getAttribute(IMavenConstants.MARKER_ATTR_GROUP_ID, ""),
-            getMarker().getAttribute(IMavenConstants.MARKER_ATTR_ARTIFACT_ID, ""),
-            getMarker().getAttribute(IMavenConstants.MARKER_ATTR_VERSION, ""),
-            getMarker().getAttribute(IMavenConstants.MARKER_ATTR_GOAL, ""));
-        dialog.setBlockOnOpen(true);
-        if(dialog.open() == Window.OK) {
-          pomFile[0] = dialog.getPomFile();
-        }
+    PlatformUI.getWorkbench().getDisplay().syncExec(() -> {
+      LifecycleMappingDialog dialog = new LifecycleMappingDialog(Display.getCurrent().getActiveShell(),
+          (IFile) getMarker().getResource(), getMarker().getAttribute(IMavenConstants.MARKER_ATTR_GROUP_ID, ""),
+          getMarker().getAttribute(IMavenConstants.MARKER_ATTR_ARTIFACT_ID, ""),
+          getMarker().getAttribute(IMavenConstants.MARKER_ATTR_VERSION, ""),
+          getMarker().getAttribute(IMavenConstants.MARKER_ATTR_GOAL, ""));
+      dialog.setBlockOnOpen(true);
+      if(dialog.open() == Window.OK) {
+        pomFile[0] = dialog.getPomFile();
       }
     });
     if(pomFile[0] != null) {

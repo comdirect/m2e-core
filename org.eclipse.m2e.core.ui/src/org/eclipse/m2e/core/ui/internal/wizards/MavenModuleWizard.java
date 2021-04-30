@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -25,7 +27,6 @@ import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import org.eclipse.core.resources.IFile;
@@ -39,13 +40,8 @@ import org.eclipse.core.runtime.jobs.IJobChangeEvent;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.jobs.JobChangeAdapter;
 import org.eclipse.jface.dialogs.MessageDialog;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.osgi.util.NLS;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.INewWizard;
@@ -121,32 +117,22 @@ public class MavenModuleWizard extends AbstractMavenProjectWizard implements INe
 
     parametersPage.setArtifactIdEnabled(false);
 
-    parentPage.addArchetypeSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        boolean isArchetype = !parentPage.isSimpleProject();
-        archetypePage.setUsed(isArchetype);
-        parametersPage.setUsed(isArchetype);
-      }
+    parentPage.addArchetypeSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      boolean isArchetype = !parentPage.isSimpleProject();
+      archetypePage.setUsed(isArchetype);
+      parametersPage.setUsed(isArchetype);
+    }));
+
+    parentPage.addModuleNameListener(e -> {
+      parametersPage.setProjectName(parentPage.getModuleName());
+      artifactPage.setProjectName(parentPage.getModuleName());
     });
 
-    parentPage.addModuleNameListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        parametersPage.setProjectName(parentPage.getModuleName());
-        artifactPage.setProjectName(parentPage.getModuleName());
-      }
-    });
+    parentPage.addParentProjectListener(e -> copyParentValues());
 
-    parentPage.addParentProjectListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        copyParentValues();
-      }
-    });
-
-    archetypePage.addArchetypeSelectionListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent selectionchangedevent) {
-        parametersPage.setArchetype(archetypePage.getArchetype());
-        getContainer().updateButtons();
-      }
+    archetypePage.addArchetypeSelectionListener(selectionchangedevent -> {
+      parametersPage.setArchetype(archetypePage.getArchetype());
+      getContainer().updateButtons();
     });
 
     if(selection != null && selection.size() > 0) {
@@ -273,13 +259,11 @@ public class MavenModuleWizard extends AbstractMavenProjectWizard implements INe
           if(!isEditor) {
             //add the <module> element to the parent pom
             try {
-              performOnDOMDocument(new OperationTuple(parentPom, new Operation() {
-                public void process(Document document) {
-                  Element root = document.getDocumentElement();
-                  Element modules = getChild(root, "modules"); //$NON-NLS-1$
-                  if(findChild(modules, "module", textEquals(moduleName)) == null) { //$NON-NLS-1$
-                    format(createElementWithText(modules, "module", moduleName)); //$NON-NLS-1$
-                  }
+              performOnDOMDocument(new OperationTuple(parentPom, (Operation) document -> {
+                Element root = document.getDocumentElement();
+                Element modules = getChild(root, "modules"); //$NON-NLS-1$
+                if(findChild(modules, "module", textEquals(moduleName)) == null) { //$NON-NLS-1$
+                  format(createElementWithText(modules, "module", moduleName)); //$NON-NLS-1$
                 }
               }));
             } catch(Exception e) {
@@ -288,13 +272,9 @@ public class MavenModuleWizard extends AbstractMavenProjectWizard implements INe
           }
 
         } else {
-          Display.getDefault().asyncExec(new Runnable() {
-            public void run() {
-              MessageDialog.openError(getShell(), //
-                  NLS.bind(Messages.wizardProjectJobFailed, moduleName), //
-                  result.getMessage());
-            }
-          });
+          Display.getDefault().asyncExec(() -> MessageDialog.openError(getShell(), //
+              NLS.bind(Messages.wizardProjectJobFailed, moduleName), //
+              result.getMessage()));
         }
       }
     });

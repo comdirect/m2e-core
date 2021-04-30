@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
 
 package org.eclipse.m2e.core.ui.internal.util;
@@ -32,7 +34,7 @@ import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.IWorkbenchCommandConstants;
 import org.eclipse.ui.fieldassist.ContentAssistCommandAdapter;
 
-import org.apache.lucene.queryParser.QueryParser;
+import org.apache.lucene.queryparser.classic.QueryParser;
 
 import org.apache.maven.project.MavenProject;
 
@@ -88,21 +90,19 @@ public class ProposalUtil {
     decoration.setDescriptionText(fieldDecoration.getDescription());
     decoration.setImage(fieldDecoration.getImage());
 
-    IContentProposalProvider proposalProvider = new IContentProposalProvider() {
-      public IContentProposal[] getProposals(String contents, int position) {
-        final String start = contents.length() > position ? contents.substring(0, position) : contents;
-        ArrayList<IContentProposal> proposals = new ArrayList<IContentProposal>();
-        try {
-          for(final String text : searcher.search()) {
-            if(text.startsWith(start)) {
-              proposals.add(new TextProposal(text));
-            }
+    IContentProposalProvider proposalProvider = (contents, position) -> {
+      final String start = contents.length() > position ? contents.substring(0, position) : contents;
+      ArrayList<IContentProposal> proposals = new ArrayList<IContentProposal>();
+      try {
+        for(final String text : searcher.search()) {
+          if(text.startsWith(start)) {
+            proposals.add(new TextProposal(text));
           }
-        } catch(CoreException e) {
-          log.error(e.getMessage(), e);
         }
-        return proposals.toArray(new IContentProposal[proposals.size()]);
+      } catch(CoreException e) {
+        log.error(e.getMessage(), e);
       }
+      return proposals.toArray(new IContentProposal[proposals.size()]);
     };
 
     IControlContentAdapter contentAdapter;

@@ -1,9 +1,11 @@
 /*************************************************************************************
  * Copyright (c) 2011-2018 Red Hat, Inc. and others.
  * All rights reserved. This program and the accompanying materials 
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  * 
  * Contributors:
  *     Fred Bricon / JBoss by Red Hat - Initial implementation.
@@ -40,9 +42,9 @@ import org.eclipse.core.runtime.jobs.IJobChangeEvent;
 import org.eclipse.core.runtime.jobs.IJobChangeListener;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.jobs.JobChangeAdapter;
-import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.viewers.ISelection;
+import org.eclipse.jface.window.Window;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IFileEditorInput;
@@ -119,17 +121,14 @@ public class ProfileSelectionHandler extends AbstractHandler {
       @Override
       public void done(IJobChangeEvent event) {
         if(getProfilesJob.getResult().isOK()) {
-          shell.getDisplay().syncExec(new Runnable() {
-
-            public void run() {
-              List<ProfileSelection> sharedProfiles = getProfilesJob.getSharedProfiles();
-              Map<IMavenProjectFacade, List<ProfileData>> allProfiles = getProfilesJob.getAllProfiles();
-              final SelectProfilesDialog dialog = new SelectProfilesDialog(shell, facades, sharedProfiles);
-              if(dialog.open() == Dialog.OK) {
-                Job job = new UpdateProfilesJob(allProfiles, sharedProfiles, profileManager, dialog);
-                job.setRule(MavenPlugin.getProjectConfigurationManager().getRule());
-                job.schedule();
-              }
+          shell.getDisplay().syncExec(() -> {
+            List<ProfileSelection> sharedProfiles = getProfilesJob.getSharedProfiles();
+            Map<IMavenProjectFacade, List<ProfileData>> allProfiles = getProfilesJob.getAllProfiles();
+            final SelectProfilesDialog dialog = new SelectProfilesDialog(shell, facades, sharedProfiles);
+            if(dialog.open() == Window.OK) {
+              Job job = new UpdateProfilesJob(allProfiles, sharedProfiles, profileManager, dialog);
+              job.setRule(MavenPlugin.getProjectConfigurationManager().getRule());
+              job.schedule();
             }
           });
 
@@ -213,14 +212,16 @@ public class ProfileSelectionHandler extends AbstractHandler {
 
       // Init the smallest profiles selection possible
       List<ProfileSelection> selection = new ArrayList<ProfileSelection>();
-      for(ProfileData p : currentSelection) {
-        ProfileSelection ps = new ProfileSelection();
-        ps.setId(p.getId());
-        ps.setActivationState(p.getActivationState());
-        ps.setAutoActive(p.isAutoActive());
-        ps.setSource(p.getSource());
-        ps.setSelected(p.isUserSelected());
-        selection.add(ps);
+      if(currentSelection != null) {
+        for(ProfileData p : currentSelection) {
+          ProfileSelection ps = new ProfileSelection();
+          ps.setId(p.getId());
+          ps.setActivationState(p.getActivationState());
+          ps.setAutoActive(p.isAutoActive());
+          ps.setSource(p.getSource());
+          ps.setSelected(p.isUserSelected());
+          selection.add(ps);
+        }
       }
 
       if(!projectProfiles.isEmpty()) {

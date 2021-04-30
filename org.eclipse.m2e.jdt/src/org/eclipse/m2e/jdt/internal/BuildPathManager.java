@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -30,9 +32,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -137,7 +139,7 @@ public class BuildPathManager implements IMavenProjectChangedListener, IResource
 
   final File stateLocationDir;
 
-  final Map<String, Set<String>> requiredModulesMap = new ConcurrentHashMap<String, Set<String>>();
+  final Map<String, InternalModuleInfo> moduleInfosMap = new ConcurrentHashMap<String, InternalModuleInfo>();
 
   private final DownloadSourcesJob downloadSourcesJob;
 
@@ -283,8 +285,7 @@ public class BuildPathManager implements IMavenProjectChangedListener, IResource
     return entries;
   }
 
-  private IClasspathManagerDelegate getDelegate(IMavenProjectFacade projectFacade, IProgressMonitor monitor)
-      throws CoreException {
+  private IClasspathManagerDelegate getDelegate(IMavenProjectFacade projectFacade, IProgressMonitor monitor) {
     ILifecycleMapping lifecycleMapping = LifecycleMappingFactory.getLifecycleMapping(projectFacade);
     if(lifecycleMapping instanceof IClasspathManagerDelegate) {
       return (IClasspathManagerDelegate) lifecycleMapping;
@@ -610,7 +611,7 @@ public class BuildPathManager implements IMavenProjectChangedListener, IResource
         log.error("Can't delete " + containerState.getAbsolutePath()); //$NON-NLS-1$
       }
 
-      requiredModulesMap.remove(project.getLocation().toString());
+      moduleInfosMap.remove(project.getLocation().toString());
 
     } else if(IResourceChangeEvent.POST_CHANGE == type) {
 
@@ -661,18 +662,18 @@ public class BuildPathManager implements IMavenProjectChangedListener, IResource
               return false;
             }
             String location = p.getLocation().toString();
-            Set<String> requiredModules = new TreeSet<>(ModuleSupport.getRequiredModules(jp, monitor));
+            InternalModuleInfo newModuleInfo = ModuleSupport.getModuleInfo(jp, monitor);
             if(monitor.isCanceled()) {
               return false;
             }
             // Probably not the best way to detect if module path has changed, like, on the very 1st time a 
             // module-info.java is modified, there will be no previous state to compare to, but should work 
             // well enough the rest of the time, for cases that don't involve obscure module path configs
-            Set<String> oldRequiredModules = requiredModulesMap.get(location);
-            if(requiredModules.equals(oldRequiredModules)) {
+            InternalModuleInfo oldModuleInfo = moduleInfosMap.get(location);
+            if(Objects.equals(newModuleInfo, oldModuleInfo)) {
               return false;
             }
-            requiredModulesMap.put(location, requiredModules);
+            moduleInfosMap.put(location, newModuleInfo);
             return true;
           } catch(JavaModelException ex) {
             log.error(ex.getMessage(), ex);
@@ -813,10 +814,27 @@ public class BuildPathManager implements IMavenProjectChangedListener, IResource
   }
 
   public void scheduleDownload(IPackageFragmentRoot fragment, boolean downloadSources, boolean downloadJavadoc) {
+    if(fragment == null) {
+      return;
+    }
     ArtifactKey artifact = fragment.getAdapter(ArtifactKey.class);
-
     if(artifact == null) {
       // we don't know anything about this JAR/ZIP
+      return;
+    }
+    scheduleDownload(fragment, artifact, downloadSources, downloadJavadoc);
+  }
+
+  /**
+   * Download sources for an {@link IPackageFragmentRoot} that has already been identified as the given
+   * <code>artifact</code>. <br/>
+   * TODO promote to API in {@link IClasspathManager} once this as been battle-tested.
+   * 
+   * @since 1.16.0
+   */
+  public void scheduleDownload(IPackageFragmentRoot fragment, ArtifactKey artifact, boolean downloadSources,
+      boolean downloadJavadoc) {
+    if(fragment == null || artifact == null) {
       return;
     }
 

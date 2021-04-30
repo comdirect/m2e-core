@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -15,6 +17,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +58,6 @@ import org.apache.maven.project.MavenProject;
 import org.eclipse.m2e.core.ui.internal.dialogs.MavenMessageDialog;
 import org.eclipse.m2e.core.ui.internal.util.Util;
 import org.eclipse.m2e.editor.internal.Messages;
-import org.eclipse.m2e.editor.xml.internal.FormHoverProvider;
 
 
 /**
@@ -99,10 +101,9 @@ public abstract class FormUtils {
       }
       setMessageAndTTip(form, NLS.bind(Messages.FormUtils_click_for_details, truncMsg), message, severity);
       return true;
-    } else {
-      setMessageAndTTip(form, message, message, severity);
-      return false;
     }
+    setMessageAndTTip(form, message, message, severity);
+    return false;
   }
 
   public static void setMessageAndTTip(final ScrolledForm form, final String message, final String ttip,
@@ -120,8 +121,7 @@ public abstract class FormUtils {
    * @param severity
    * @param runnable something that will be "run" once the user clicks the message area.
    */
-  static void setMessageWithPerformer(ScrolledForm form, String message, int severity,
-      FormHoverProvider.Execute runnable) {
+  static void setMessageWithPerformer(ScrolledForm form, String message, int severity, Consumer<Point> runnable) {
     form.getForm().setMessage(message, severity);
     addFormTitleListeners(runnable, form);
   }
@@ -166,8 +166,8 @@ public abstract class FormUtils {
       url = url.trim();
       try {
         IWorkbenchBrowserSupport browserSupport = PlatformUI.getWorkbench().getBrowserSupport();
-        IWebBrowser browser = browserSupport.createBrowser(IWorkbenchBrowserSupport.NAVIGATION_BAR
-            | IWorkbenchBrowserSupport.LOCATION_BAR, url, url, url);
+        IWebBrowser browser = browserSupport.createBrowser(
+            IWorkbenchBrowserSupport.NAVIGATION_BAR | IWorkbenchBrowserSupport.LOCATION_BAR, url, url, url);
         browser.openURL(new URL(url));
       } catch(PartInitException ex) {
         log.error(ex.getMessage(), ex);
@@ -243,22 +243,19 @@ public abstract class FormUtils {
     }
   }
 
-  private static FormHoverProvider.Execute createDefaultPerformer(final ScrolledForm form, final String message,
+  private static Consumer<Point> createDefaultPerformer(final ScrolledForm form, final String message,
       final String ttip, final int severity) {
     if(ttip != null && ttip.length() > 0 && message != null) {
-      return new FormHoverProvider.Execute() {
-
-        public void run(Point point) {
-          int dialogSev = IMessageProvider.ERROR == severity ? MessageDialog.ERROR : MessageDialog.WARNING;
-          MavenMessageDialog.openWithSeverity(form.getShell(), Messages.FormUtils_error_info,
-              Messages.FormUtils_pom_error, ttip, dialogSev);
-        }
+      return point -> {
+        int dialogSev = IMessageProvider.ERROR == severity ? MessageDialog.ERROR : MessageDialog.WARNING;
+        MavenMessageDialog.openWithSeverity(form.getShell(), Messages.FormUtils_error_info,
+            Messages.FormUtils_pom_error, ttip, dialogSev);
       };
     }
     return null;
   }
 
-  private static void addFormTitleListeners(final FormHoverProvider.Execute runnable, final ScrolledForm form) {
+  private static void addFormTitleListeners(final Consumer<Point> runnable, final ScrolledForm form) {
     if(runnable != null) {
       final Composite head = form.getForm().getHead();
       Control[] kids = head.getChildren();
@@ -273,7 +270,7 @@ public abstract class FormUtils {
           cleanupMouseListeners(kid, SWT.MouseExit);
           kid.addMouseListener(new MouseAdapter() {
             public void mouseUp(MouseEvent e) {
-              runnable.run(kid.toDisplay(new Point(e.x, e.y)));
+              runnable.accept(kid.toDisplay(new Point(e.x, e.y)));
             }
           });
           kid.addMouseTrackListener(new MouseTrackAdapter() {
@@ -325,8 +322,8 @@ public abstract class FormUtils {
       if(props != null) {
         inter.addValueSource(new PropertiesBasedValueSource(props));
       }
-      inter.addValueSource(new PrefixedObjectValueSource(
-          Arrays.asList(new String[] {"pom.", "project."}), project.getModel(), false)); //$NON-NLS-1$ //$NON-NLS-2$
+      inter.addValueSource(
+          new PrefixedObjectValueSource(Arrays.asList(new String[] {"pom.", "project."}), project.getModel(), false)); //$NON-NLS-1$ //$NON-NLS-2$
       try {
         text = inter.interpolate(text);
       } catch(InterpolationException e) {

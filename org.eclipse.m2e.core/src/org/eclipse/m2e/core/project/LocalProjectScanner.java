@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -13,6 +15,8 @@ package org.eclipse.m2e.core.project;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -140,7 +144,10 @@ public class LocalProjectScanner extends AbstractProjectScanner<MavenProjectInfo
         return null;
       }
 
-      Model model = modelManager.readMavenModel(pomFile);
+      Model model = null;
+      try (InputStream pomStream = Files.newInputStream(pomFile.toPath())) {
+        model = modelManager.readMavenModel(pomStream);
+      }
 
       String pomName = modulePath + "/" + IMavenConstants.POM_FILE_NAME; //$NON-NLS-1$
 
@@ -191,9 +198,7 @@ public class LocalProjectScanner extends AbstractProjectScanner<MavenProjectInfo
 
       return projectInfo;
 
-    } catch(CoreException ex) {
-      addError(ex);
-    } catch(IOException ex) {
+    } catch(CoreException | IOException ex) {
       addError(ex);
     }
 
@@ -208,7 +213,7 @@ public class LocalProjectScanner extends AbstractProjectScanner<MavenProjectInfo
     return folders.toString();
   }
 
-  private int getBasedirRename(MavenProjectInfo mavenProjectInfo) throws IOException {
+  private int getBasedirRename(MavenProjectInfo mavenProjectInfo) {
 
     if(basedirRemameRequired) {
       return MavenProjectInfo.RENAME_REQUIRED;

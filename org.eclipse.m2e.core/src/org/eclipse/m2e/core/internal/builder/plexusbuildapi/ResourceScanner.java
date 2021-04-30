@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -18,7 +20,6 @@ import java.util.List;
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IResource;
-import org.eclipse.core.resources.IResourceVisitor;
 import org.eclipse.core.runtime.CoreException;
 
 import org.codehaus.plexus.util.AbstractScanner;
@@ -61,24 +62,20 @@ public class ResourceScanner extends AbstractScanner {
   }
 
   private void scanResource() throws CoreException {
-    resource.accept(new IResourceVisitor() {
-
-      public boolean visit(IResource resource) {
-        String relpath = getRelativePath(resource);
-        if(isIncluded(relpath) && !isExcluded(relpath)) {
-          if(resource instanceof IContainer) {
-            includedDirectories.add(relpath);
-          } else {
-            includedFiles.add(relpath);
-          }
-          return true;
-        } else if(resource instanceof IFolder) {
-          return couldHoldIncluded(relpath);
+    resource.accept(resource -> {
+      String relpath = getRelativePath(resource);
+      if(isIncluded(relpath) && !isExcluded(relpath)) {
+        if(resource instanceof IContainer) {
+          includedDirectories.add(relpath);
+        } else {
+          includedFiles.add(relpath);
         }
-
-        return false;
+        return true;
+      } else if(resource instanceof IFolder) {
+        return couldHoldIncluded(relpath);
       }
 
+      return false;
     });
   }
 

@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -12,12 +14,11 @@
 package org.eclipse.m2e.core.ui.internal.console;
 
 import java.io.IOException;
+import java.text.DateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-import com.ibm.icu.text.DateFormat;
-import com.ibm.icu.util.ULocale;
 
 import org.eclipse.jface.preference.JFacePreferences;
 import org.eclipse.jface.resource.ColorRegistry;
@@ -78,12 +79,10 @@ public class MavenConsoleImpl extends IOConsole implements MavenConsole, IProper
     super.init();
 
     //  Ensure that initialization occurs in the UI thread
-    Display.getDefault().asyncExec(new Runnable() {
-      public void run() {
-        JFaceResources.getFontRegistry().addListener(MavenConsoleImpl.this);
-        initializeConsoleStreams(Display.getDefault());
-        dumpConsole();
-      }
+    Display.getDefault().asyncExec(() -> {
+      JFaceResources.getFontRegistry().addListener(MavenConsoleImpl.this);
+      initializeConsoleStreams(Display.getDefault());
+      dumpConsole();
     });
   }
 
@@ -147,31 +146,29 @@ public class MavenConsoleImpl extends IOConsole implements MavenConsole, IProper
     //the synchronization here caused a deadlock. since the writes are simply appending to the output stream
     //or the document, just doing it on the main thread to avoid deadlocks and or corruption of the
     //document or output stream
-    Display.getDefault().asyncExec(new Runnable() {
-      public void run() {
-        if(isVisible()) {
-          try {
-            switch(type) {
-              case ConsoleDocument.COMMAND:
-                getCommandStream().write(line);
-                getCommandStream().write('\n');
-                break;
-              case ConsoleDocument.MESSAGE:
-                getMessageStream().write(line);
-                getMessageStream().write('\n');
-                break;
-              case ConsoleDocument.ERROR:
-                getErrorStream().write(line);
-                getErrorStream().write('\n');
-                break;
-            }
-          } catch(IOException ex) {
-            // Don't log using slf4j - it will cause a cycle
-            ex.printStackTrace();
+    Display.getDefault().asyncExec(() -> {
+      if(isVisible()) {
+        try {
+          switch(type) {
+            case ConsoleDocument.COMMAND:
+              getCommandStream().write(line);
+              getCommandStream().write('\n');
+              break;
+            case ConsoleDocument.MESSAGE:
+              getMessageStream().write(line);
+              getMessageStream().write('\n');
+              break;
+            case ConsoleDocument.ERROR:
+              getErrorStream().write(line);
+              getErrorStream().write('\n');
+              break;
           }
-        } else {
-          getConsoleDocument().appendConsoleLine(type, line);
+        } catch(IOException ex) {
+          // Don't log using slf4j - it will cause a cycle
+          ex.printStackTrace();
         }
+      } else {
+        getConsoleDocument().appendConsoleLine(type, line);
       }
     });
   }
@@ -231,11 +228,9 @@ public class MavenConsoleImpl extends IOConsole implements MavenConsole, IProper
     // Here we can't call super.dispose() because we actually want the partitioner to remain
     // connected, but we won't show lines until the console is added to the console manager
     // again.
-    Display.getDefault().asyncExec(new Runnable() {
-      public void run() {
-        setVisible(false);
-        JFaceResources.getFontRegistry().removeListener(MavenConsoleImpl.this);
-      }
+    Display.getDefault().asyncExec(() -> {
+      setVisible(false);
+      JFaceResources.getFontRegistry().removeListener(MavenConsoleImpl.this);
     });
   }
 
@@ -249,7 +244,7 @@ public class MavenConsoleImpl extends IOConsole implements MavenConsole, IProper
   }
 
   private DateFormat getDateFormat() {
-    return DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.LONG, ULocale.getDefault());
+    return DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.LONG, Locale.getDefault());
   }
 
   // MavenConsole

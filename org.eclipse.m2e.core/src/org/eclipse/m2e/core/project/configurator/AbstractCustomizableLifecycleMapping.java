@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -43,7 +45,7 @@ public abstract class AbstractCustomizableLifecycleMapping extends AbstractLifec
   public Map<MojoExecutionKey, List<AbstractBuildParticipant>> getBuildParticipants(IMavenProjectFacade projectFacade,
       IProgressMonitor monitor) throws CoreException {
     log.debug("Build participants for {}", projectFacade.getMavenProject());
-    Map<MojoExecutionKey, List<AbstractBuildParticipant>> result = new LinkedHashMap<MojoExecutionKey, List<AbstractBuildParticipant>>();
+    Map<MojoExecutionKey, List<AbstractBuildParticipant>> result = new LinkedHashMap<>();
 
     Map<MojoExecutionKey, List<IPluginExecutionMetadata>> mapping = projectFacade.getMojoExecutionMapping();
     Map<String, AbstractProjectConfigurator> configurators = getProjectConfigurators(projectFacade);
@@ -56,13 +58,13 @@ public abstract class AbstractCustomizableLifecycleMapping extends AbstractLifec
         MojoExecutionKey mojoExecutionKey = new MojoExecutionKey(mojoExecution);
         log.debug("Mojo execution key: {}", mojoExecutionKey);
         List<IPluginExecutionMetadata> executionMetadatas = mapping.get(mojoExecutionKey);
-        List<AbstractBuildParticipant> executionMappings = new ArrayList<AbstractBuildParticipant>();
+        List<AbstractBuildParticipant> executionMappings = new ArrayList<>();
         if(executionMetadatas != null) {
           for(IPluginExecutionMetadata executionMetadata : executionMetadatas) {
             switch(executionMetadata.getAction()) {
               case execute:
                 log.debug("\tAction: {}", executionMetadata.getAction());
-                executionMappings.add(LifecycleMappingFactory.createMojoExecutionBuildParicipant(projectFacade,
+                executionMappings.add(LifecycleMappingFactory.createMojoExecutionBuildParicipant(
                     projectFacade.getMojoExecution(mojoExecutionKey, monitor), executionMetadata));
                 break;
               case configurator:
@@ -101,7 +103,7 @@ public abstract class AbstractCustomizableLifecycleMapping extends AbstractLifec
 
   public List<AbstractProjectConfigurator> getProjectConfigurators(IMavenProjectFacade projectFacade,
       IProgressMonitor monitor) {
-    return new ArrayList<AbstractProjectConfigurator>(getProjectConfigurators(projectFacade).values());
+    return new ArrayList<>(getProjectConfigurators(projectFacade).values());
   }
 
   private Map<String, AbstractProjectConfigurator> getProjectConfigurators(IMavenProjectFacade projectFacade) {

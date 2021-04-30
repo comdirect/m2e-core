@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2015 Sonatype, Inc. and others
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -48,11 +50,13 @@ public class MavenMarkerResolutionGenerator implements IMarkerResolutionGenerato
       }
       if(isDependencyVersionOverride(hint)) {
         return new IMarkerResolution[] {new ManagedVersionRemovalResolution(marker, true),
-            new IgnoreWarningResolution(marker, IMavenConstants.MARKER_IGNORE_MANAGED)};
+            new IgnoreWarningResolution(marker, IMavenConstants.MARKER_IGNORE_MANAGED),
+            new OpenManagedVersionDefinitionResolution(marker)};
       }
       if(isPluginVersionOverride(hint)) {
         return new IMarkerResolution[] {new ManagedVersionRemovalResolution(marker, false),
-            new IgnoreWarningResolution(marker, IMavenConstants.MARKER_IGNORE_MANAGED)};
+            new IgnoreWarningResolution(marker, IMavenConstants.MARKER_IGNORE_MANAGED),
+            new OpenManagedVersionDefinitionResolution(marker)};
       }
       if(hint.equals(IMavenConstants.EDITOR_HINT_NOT_COVERED_MOJO_EXECUTION)) {
         return new IMarkerResolution[] {new LifecycleMappingResolution(marker, PluginExecutionAction.ignore),

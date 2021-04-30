@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -12,6 +14,8 @@
 package org.eclipse.m2e.core.internal.project.registry;
 
 import java.io.File;
+import java.io.InputStream;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -29,7 +33,6 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -41,10 +44,10 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalCause;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
 
+import org.eclipse.core.filesystem.EFS;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
@@ -333,30 +336,26 @@ public class ProjectRegistryManager {
     // safety net -- do not force refresh of the same installed/resolved artifact more than once 
     final Set<ArtifactKey> installedArtifacts = new HashSet<ArtifactKey>();
 
-    ILocalRepositoryListener listener = new ILocalRepositoryListener() {
-      public void artifactInstalled(File repositoryBasedir, ArtifactKey baseArtifact, ArtifactKey artifact,
-          File artifactFile) {
-        if(artifactFile == null) {
-          // resolution error
-          return;
-        }
-        // TODO remove=false?
-        Set<IFile> refresh = new LinkedHashSet<IFile>();
-        if(installedArtifacts.add(artifact)) {
-          refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenParent(artifact), true));
-          refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenArtifact(artifact), true));
-          refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenArtifactImport(artifact), true));
-        }
-        if(installedArtifacts.add(baseArtifact)) {
-          refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenParent(baseArtifact), true));
-          refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenArtifact(baseArtifact), true));
-          refresh
-              .addAll(newState.getVersionedDependents(MavenCapability.createMavenArtifactImport(baseArtifact), true));
-        }
-        if(!refresh.isEmpty()) {
-          log.debug("Automatic refresh. artifact={}/{}. projects={}", new Object[] {baseArtifact, artifact, refresh});
-          context.forcePomFiles(refresh);
-        }
+    ILocalRepositoryListener listener = (repositoryBasedir, baseArtifact, artifact, artifactFile) -> {
+      if(artifactFile == null) {
+        // resolution error
+        return;
+      }
+      // TODO remove=false?
+      Set<IFile> refresh = new LinkedHashSet<IFile>();
+      if(installedArtifacts.add(artifact)) {
+        refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenParent(artifact), true));
+        refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenArtifact(artifact), true));
+        refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenArtifactImport(artifact), true));
+      }
+      if(installedArtifacts.add(baseArtifact)) {
+        refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenParent(baseArtifact), true));
+        refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenArtifact(baseArtifact), true));
+        refresh.addAll(newState.getVersionedDependents(MavenCapability.createMavenArtifactImport(baseArtifact), true));
+      }
+      if(!refresh.isEmpty()) {
+        log.debug("Automatic refresh. artifact={}/{}. projects={}", new Object[] {baseArtifact, artifact, refresh});
+        context.forcePomFiles(refresh);
       }
     };
 
@@ -558,9 +557,9 @@ public class ProjectRegistryManager {
       newFacade.setMavenProjectArtifacts(getMavenProject(newFacade));
     } else {
       if(pom.isAccessible() && pom.getProject().hasNature(IMavenConstants.NATURE_ID)) {
-        try {
+        try (InputStream is = pom.getContents()) {
           // MNGECLIPSE-605 embedder is not able to resolve the project due to missing configuration in the parent
-          Model model = getMaven().readModel(pom.getLocation().toFile());
+          Model model = getMaven().readModel(is);
           if(model != null && model.getParent() != null) {
             Parent parent = model.getParent();
             if(parent.getGroupId() != null && parent.getArtifactId() != null && parent.getVersion() != null) {
@@ -736,15 +735,15 @@ public class ProjectRegistryManager {
       result.putAll(execute(state, poms.size() == 1 ? pomFiles.iterator().next() : null, resolverConfiguration,
           (executionContext, pm) -> {
             Map<File, MavenExecutionResult> mavenResults = getMaven().readMavenProjects(pomFiles.stream()
-                .filter(IFile::isAccessible).map(pom -> pom.getLocation().toFile()).collect(Collectors.toList()),
+                .filter(IFile::isAccessible).map(ProjectRegistryManager::toJavaIoFile).collect(Collectors.toList()),
                 executionContext.newProjectBuildingRequest());
 
             Map<IFile, MavenProjectFacade> facades = new HashMap<>(mavenResults.size(), 1.f);
             for (IFile pom : pomFiles) {
               if (!pom.isAccessible()) {
-            	  continue;
+                continue;
               }
-              MavenExecutionResult mavenResult = mavenResults.get(pom.getLocation().toFile());
+              MavenExecutionResult mavenResult = mavenResults.get(ProjectRegistryManager.toJavaIoFile(pom));
               MavenProject mavenProject = mavenResult.getProject();
               MarkerUtils.addEditorHintMarkers(markerManager, pom, mavenProject,
                       IMavenConstants.MARKER_POM_LOADING_ID);
@@ -868,15 +867,17 @@ public class ProjectRegistryManager {
           (context, aMonitor) -> {
         ProjectBuildingRequest configuration = context.newProjectBuildingRequest();
         configuration.setResolveDependencies(true);
-        return getMaven().readMavenProjects(
-              pomFiles.stream().map(file -> file.getLocation().toFile()).collect(Collectors.toList()),
-              configuration);
+            return getMaven().readMavenProjects(
+                pomFiles.stream().map(ProjectRegistryManager::toJavaIoFile).filter(Objects::nonNull)
+                    .collect(Collectors.toList()),
+                configuration);
       }, monitor);
     } catch(CoreException ex) {
       MavenExecutionResult result = new DefaultMavenExecutionResult();
       result.addException(ex);
-      return pomFiles.stream().filter(IResource::isAccessible).map(IResource::getLocation).filter(Objects::nonNull)
-          .map(IPath::toFile).collect(HashMap::new, (map, pomFile) -> map.put(pomFile, result),
+      return pomFiles.stream().filter(IResource::isAccessible).map(ProjectRegistryManager::toJavaIoFile)
+          .filter(Objects::nonNull)
+          .collect(HashMap::new, (map, pomFile) -> map.put(pomFile, result),
               (container, toFold) -> container.putAll(toFold));
     }
   }
@@ -919,8 +920,8 @@ public class ProjectRegistryManager {
 
       /*package*/MavenExecutionRequest configureExecutionRequest(MavenExecutionRequest request, IProjectRegistry state,
           IFile pom, ResolverConfiguration resolverConfiguration) throws CoreException {
-    if(pom != null) {
-      request.setPom(pom.getLocation().toFile());
+        if(pom != null) {
+          request.setPom(ProjectRegistryManager.toJavaIoFile(pom));
     }
 
     request.addActiveProfiles(resolverConfiguration.getActiveProfileList());
@@ -1064,11 +1065,8 @@ public class ProjectRegistryManager {
     mavenProject = mavenProjects.get(facade);
     if(mavenProject == null) {
       try {
-        mavenProject = mavenProjectCache.get(facade, new Callable<MavenProject>() {
-          public MavenProject call() throws Exception {
-            return readProjectWithDependencies(facade.getPom(), facade.getResolverConfiguration(), monitor);
-          }
-        });
+        mavenProject = mavenProjectCache.get(facade,
+            () -> readProjectWithDependencies(facade.getPom(), facade.getResolverConfiguration(), monitor));
       } catch(ExecutionException ex) {
         Throwable cause = ex.getCause();
         if(cause instanceof CoreException) {
@@ -1137,17 +1135,15 @@ public class ProjectRegistryManager {
   }
 
   private Cache<MavenProjectFacade, MavenProject> createProjectCache() {
-    final RemovalListener<MavenProjectFacade, MavenProject> removalListener = new RemovalListener<MavenProjectFacade, MavenProject>() {
-      public void onRemoval(RemovalNotification<MavenProjectFacade, MavenProject> notification) {
-        if(notification.getCause() == RemovalCause.SIZE || notification.getCause() == RemovalCause.REPLACED) {
-          // there is currently no good way to determine if MavenProject instance is still being used or not
-          // for now assume that cache entries removed from project cache can only be referenced by context map
-          final MavenProjectFacade facade = notification.getKey();
-          final MavenProject mavenProject = notification.getValue();
-          final Map<MavenProjectFacade, MavenProject> contextProjects = getContextProjects();
-          if(contextProjects != null && !contextProjects.containsKey(facade)) {
-            flushMavenCaches(facade.getPomFile(), facade.getArtifactKey(), mavenProject, false);
-          }
+    final RemovalListener<MavenProjectFacade, MavenProject> removalListener = notification -> {
+      if(notification.getCause() == RemovalCause.SIZE || notification.getCause() == RemovalCause.REPLACED) {
+        // there is currently no good way to determine if MavenProject instance is still being used or not
+        // for now assume that cache entries removed from project cache can only be referenced by context map
+        final MavenProjectFacade facade = notification.getKey();
+        final MavenProject mavenProject = notification.getValue();
+        final Map<MavenProjectFacade, MavenProject> contextProjects = getContextProjects();
+        if(contextProjects != null && !contextProjects.containsKey(facade)) {
+          flushMavenCaches(facade.getPomFile(), facade.getArtifactKey(), mavenProject, false);
         }
       }
     };
@@ -1199,5 +1195,24 @@ public class ProjectRegistryManager {
       // can't really happen
     }
     return Collections.emptySet();
+  }
+
+  static File toJavaIoFile(IFile file) {
+    IPath path = file.getLocation();
+    if(path == null) {
+      return getRemoteFile(file);
+    }
+    return path.toFile();
+  }
+
+  private static File getRemoteFile(IFile file) {
+    try {
+      URI fileLocation = file.getLocationURI();
+      org.eclipse.core.filesystem.IFileStore fileStore = EFS.getStore(fileLocation);
+      return fileStore.toLocalFile(EFS.CACHE, null);
+    } catch(CoreException ex) {
+      log.warn("Failed to create local file representation of " + file);
+      return null;
+    }
   }
 }

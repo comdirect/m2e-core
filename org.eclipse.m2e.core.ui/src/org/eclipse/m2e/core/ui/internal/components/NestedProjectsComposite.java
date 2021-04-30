@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -44,12 +46,10 @@ import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITreeContentProvider;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerComparator;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
@@ -219,11 +219,7 @@ public class NestedProjectsComposite extends Composite implements IMenuListener 
 
     createMenu();
 
-    codebaseViewer.addSelectionChangedListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent event) {
-        updateSelectedProjects();
-      }
-    });
+    codebaseViewer.addSelectionChangedListener(event -> updateSelectedProjects());
 
     updateSelectedProjects();
   }
@@ -315,53 +311,37 @@ public class NestedProjectsComposite extends Composite implements IMenuListener 
     Button selectAllBtn = new Button(selectionActionComposite, SWT.NONE);
     selectAllBtn.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
     selectAllBtn.setText(Messages.UpdateDepenciesDialog_selectAll);
-    selectAllBtn.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        for(IProject project : projects) {
-          setSubtreeChecked(project, true);
-        }
-        updateSelectedProjects();
+    selectAllBtn.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      for(IProject project : projects) {
+        setSubtreeChecked(project, true);
       }
-    });
+      updateSelectedProjects();
+    }));
 
     if(showOutOfDateUI) {
       addOutOfDateBtn = new Button(selectionActionComposite, SWT.NONE);
       addOutOfDateBtn.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
       addOutOfDateBtn.setText(Messages.NestedProjectsComposite_Add_OutOfDate);
-      addOutOfDateBtn.addSelectionListener(new SelectionAdapter() {
-        public void widgetSelected(SelectionEvent e) {
-          includeOutOfDateProjects();
-        }
-      });
+      addOutOfDateBtn.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> includeOutOfDateProjects()));
     }
 
     Button deselectAllBtn = new Button(selectionActionComposite, SWT.NONE);
     deselectAllBtn.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false, 1, 1));
     deselectAllBtn.setText(Messages.UpdateDepenciesDialog_deselectAll);
-    deselectAllBtn.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        codebaseViewer.setCheckedElements(new Object[0]);
-        updateSelectedProjects();
-      }
-    });
+    deselectAllBtn.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      codebaseViewer.setCheckedElements(new Object[0]);
+      updateSelectedProjects();
+    }));
 
     Button expandAllBtn = new Button(selectionActionComposite, SWT.NONE);
     expandAllBtn.setLayoutData(new GridData(SWT.FILL, SWT.BOTTOM, false, false, 1, 1));
     expandAllBtn.setText(Messages.UpdateDepenciesDialog_expandAll);
-    expandAllBtn.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        codebaseViewer.expandAll();
-      }
-    });
+    expandAllBtn.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> codebaseViewer.expandAll()));
 
     Button collapseAllBtn = new Button(selectionActionComposite, SWT.NONE);
     collapseAllBtn.setLayoutData(new GridData(SWT.FILL, SWT.BOTTOM, false, false, 1, 1));
     collapseAllBtn.setText(Messages.UpdateDepenciesDialog_collapseAll);
-    collapseAllBtn.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        codebaseViewer.collapseAll();
-      }
-    });
+    collapseAllBtn.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> codebaseViewer.collapseAll()));
   }
 
   String getElePath(Object element) {
@@ -372,6 +352,9 @@ public class NestedProjectsComposite extends Composite implements IMenuListener 
       try {
         IFileStore store = EFS.getStore(locationURI);
         File file = store.toLocalFile(0, null);
+        if(file == null) {
+          file = store.toLocalFile(EFS.CACHE, null);
+        }
         return file.toString() + SEPARATOR;
       } catch(CoreException ex) {
         log.error(ex.getMessage(), ex);

@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2015 Sonatype, Inc. and others
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -30,8 +32,8 @@ import org.eclipse.wst.sse.core.utils.StringUtils;
 
 import org.eclipse.m2e.core.internal.IMavenConstants;
 import org.eclipse.m2e.core.ui.internal.markers.EditorAwareMavenProblemResolution;
-import org.eclipse.m2e.editor.xml.internal.NodeOperation;
-import org.eclipse.m2e.editor.xml.internal.XmlUtils;
+import org.eclipse.m2e.core.ui.internal.util.XmlUtils;
+import org.eclipse.m2e.model.edit.pom.util.NodeOperation;
 
 
 @SuppressWarnings("restriction")
@@ -61,21 +63,15 @@ public abstract class AbstractPomProblemResolution extends EditorAwareMavenProbl
 
   @Override
   protected final void fix(IDocument document, List<IMarker> markers, IProgressMonitor monitor) {
-    XmlUtils.performOnRootElement(document, new NodeOperation<Element>() {
-      public void process(Element node, IStructuredDocument structured) {
-        processFix(structured, node, markers);
-      }
-    });
+    XmlUtils.performOnRootElement(document,
+        (NodeOperation<Element>) (node, structured) -> processFix(structured, node, markers));
   }
 
   @Override
   protected final void fix(IResource resource, List<IMarker> markers, IProgressMonitor monitor) {
     try {
-      XmlUtils.performOnRootElement((IFile) resource, new NodeOperation<Element>() {
-        public void process(Element node, IStructuredDocument structured) {
-          processFix(structured, node, markers);
-        }
-      }, true);
+      XmlUtils.performOnRootElement((IFile) resource, (node, structured) -> processFix(structured, node, markers),
+          true);
     } catch(IOException e) {
       LOG.error("Error processing marker", e);
     } catch(CoreException e) {
@@ -105,7 +101,7 @@ public abstract class AbstractPomProblemResolution extends EditorAwareMavenProbl
         prevString = StringUtils.convertToHTMLContent(prevString);
         nextString = StringUtils.convertToHTMLContent(nextString);
         return "<html>...<br>" + prevString + /** "<del>" + currentLine + "</del>" + */ //$NON-NLS-0$
-        nextString + "...<html>"; //$NON-NLS-1$
+            nextString + "...<html>"; //$NON-NLS-1$
       } catch(BadLocationException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();

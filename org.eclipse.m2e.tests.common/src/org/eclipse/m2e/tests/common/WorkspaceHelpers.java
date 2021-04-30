@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -15,7 +17,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -29,7 +30,6 @@ import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.IWorkspaceRunnable;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
@@ -74,19 +74,17 @@ public class WorkspaceHelpers {
     }
 
     // must be a timeout
-    throw new CoreException(new Status(IStatus.ERROR, IMavenConstants.PLUGIN_ID,
-        "Could not delete workspace resources (after " + i + " retries): "
-            + Arrays.asList(ResourcesPlugin.getWorkspace().getRoot().getProjects()), cause));
+    throw new CoreException(
+        new Status(IStatus.ERROR, IMavenConstants.PLUGIN_ID, "Could not delete workspace resources (after " + i
+            + " retries): " + Arrays.asList(ResourcesPlugin.getWorkspace().getRoot().getProjects()), cause));
   }
 
   private static void doCleanWorkspace() throws InterruptedException, CoreException, IOException {
     final IWorkspace workspace = ResourcesPlugin.getWorkspace();
-    workspace.run(new IWorkspaceRunnable() {
-      public void run(IProgressMonitor monitor) throws CoreException {
-        IProject[] projects = workspace.getRoot().getProjects();
-        for(int i = 0; i < projects.length; i++ ) {
-          projects[i].delete(true, true, monitor);
-        }
+    workspace.run((IWorkspaceRunnable) monitor -> {
+      IProject[] projects = workspace.getRoot().getProjects();
+      for(int i = 0; i < projects.length; i++ ) {
+        projects[i].delete(true, true, monitor);
       }
     }, new NullProgressMonitor());
 
@@ -142,21 +140,19 @@ public class WorkspaceHelpers {
 
   public static List<IMarker> findMarkers(IProject project, int targetSeverity, String withAttribute)
       throws CoreException {
-    SortedMap<IMarker, IMarker> errors = new TreeMap<IMarker, IMarker>(new Comparator<IMarker>() {
-      public int compare(IMarker o1, IMarker o2) {
-        int lineNumber1 = o1.getAttribute(IMarker.LINE_NUMBER, -1);
-        int lineNumber2 = o2.getAttribute(IMarker.LINE_NUMBER, -1);
-        if(lineNumber1 < lineNumber2) {
-          return -1;
-        }
-        if(lineNumber1 > lineNumber2) {
-          return 1;
-        }
-        // Markers on the same line
-        String message1 = o1.getAttribute(IMarker.MESSAGE, "");
-        String message2 = o2.getAttribute(IMarker.MESSAGE, "");
-        return message1.compareTo(message2);
+    SortedMap<IMarker, IMarker> errors = new TreeMap<IMarker, IMarker>((o1, o2) -> {
+      int lineNumber1 = o1.getAttribute(IMarker.LINE_NUMBER, -1);
+      int lineNumber2 = o2.getAttribute(IMarker.LINE_NUMBER, -1);
+      if(lineNumber1 < lineNumber2) {
+        return -1;
       }
+      if(lineNumber1 > lineNumber2) {
+        return 1;
+      }
+      // Markers on the same line
+      String message1 = o1.getAttribute(IMarker.MESSAGE, "");
+      String message2 = o2.getAttribute(IMarker.MESSAGE, "");
+      return message1.compareTo(message2);
     });
     for(IMarker marker : project.findMarkers(null /* all markers */, true /* subtypes */, IResource.DEPTH_INFINITE)) {
       int severity = marker.getAttribute(IMarker.SEVERITY, 0);
@@ -223,8 +219,8 @@ public class WorkspaceHelpers {
       if(resourceRelativePath == null) {
         resourceRelativePath = "";
       }
-      Assert.assertEquals("Marker not on the expected resource:" + toString(marker), resourceRelativePath, marker
-          .getResource().getProjectRelativePath().toString());
+      Assert.assertEquals("Marker not on the expected resource:" + toString(marker), resourceRelativePath,
+          marker.getResource().getProjectRelativePath().toString());
 
       return marker;
     }
@@ -246,8 +242,8 @@ public class WorkspaceHelpers {
     List<IMarker> markers = findMarkers(project, severity);
     IMarker marker = findMarker(type, message, lineNumber, resourceRelativePath, markers);
     if(marker == null) {
-      Assert.fail("Expected marker not found. Found " + (markers.isEmpty() ? "no markers" : "markers :")
-          + toString(markers));
+      Assert.fail(
+          "Expected marker not found. Found " + (markers.isEmpty() ? "no markers" : "markers :") + toString(markers));
     }
     Assert.assertTrue("Marker type " + type + " is not a subtype of " + IMarker.PROBLEM,
         marker.isSubtypeOf(IMarker.PROBLEM));

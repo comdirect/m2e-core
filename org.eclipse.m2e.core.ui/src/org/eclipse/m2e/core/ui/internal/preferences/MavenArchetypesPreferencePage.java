@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2018 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -22,29 +24,25 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.eclipse.jface.preference.PreferencePage;
+import org.eclipse.jface.preference.BooleanFieldEditor;
+import org.eclipse.jface.preference.FieldEditorPreferencePage;
 import org.eclipse.jface.viewers.CheckboxTableViewer;
 import org.eclipse.jface.viewers.IColorProvider;
 import org.eclipse.jface.viewers.ILabelProviderListener;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredContentProvider;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITableLabelProvider;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.StructuredSelection;
-import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.window.Window;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Link;
 import org.eclipse.swt.widgets.Table;
@@ -60,6 +58,8 @@ import org.eclipse.m2e.core.internal.archetype.ArchetypeCatalogFactory;
 import org.eclipse.m2e.core.internal.archetype.ArchetypeCatalogFactory.LocalCatalogFactory;
 import org.eclipse.m2e.core.internal.archetype.ArchetypeCatalogFactory.RemoteCatalogFactory;
 import org.eclipse.m2e.core.internal.archetype.ArchetypeManager;
+import org.eclipse.m2e.core.internal.preferences.MavenPreferenceConstants;
+import org.eclipse.m2e.core.ui.internal.M2EUIPluginActivator;
 import org.eclipse.m2e.core.ui.internal.Messages;
 
 
@@ -68,7 +68,7 @@ import org.eclipse.m2e.core.ui.internal.Messages;
  * 
  * @author Eugene Kuleshov
  */
-public class MavenArchetypesPreferencePage extends PreferencePage implements IWorkbenchPreferencePage {
+public class MavenArchetypesPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
   private static final Logger log = LoggerFactory.getLogger(MavenArchetypesPreferencePage.class);
 
   ArchetypeManager archetypeManager;
@@ -78,8 +78,9 @@ public class MavenArchetypesPreferencePage extends PreferencePage implements IWo
   List<ArchetypeCatalogFactory> archetypeCatalogs;
 
   public MavenArchetypesPreferencePage() {
+    super(GRID);
     setTitle(Messages.MavenArchetypesPreferencePage_title);
-
+    setPreferenceStore(M2EUIPluginActivator.getDefault().getPreferenceStore());
     this.archetypeManager = MavenPluginActivator.getDefault().getArchetypeManager();
   }
 
@@ -125,8 +126,8 @@ public class MavenArchetypesPreferencePage extends PreferencePage implements IWo
   public void init(IWorkbench workbench) {
   }
 
-  protected Control createContents(Composite parent) {
-    Composite composite = new Composite(parent, SWT.NONE);
+  protected void createFieldEditors() {
+    Composite composite = new Composite(getFieldEditorParent(), SWT.NONE);
     GridLayout gridLayout = new GridLayout(2, false);
     gridLayout.marginWidth = 0;
     gridLayout.marginHeight = 0;
@@ -136,20 +137,18 @@ public class MavenArchetypesPreferencePage extends PreferencePage implements IWo
     GridData gd_addRemoveOrLink = new GridData(SWT.FILL, SWT.CENTER, false, false, 2, 1);
     addRemoveOrLink.setLayoutData(gd_addRemoveOrLink);
     addRemoveOrLink.setText(Messages.MavenArchetypesPreferencePage_link);
-    addRemoveOrLink.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        try {
-          URL url = new URL(
-              "http://maven.apache.org/plugins/maven-archetype-plugin/specification/archetype-catalog.html"); //$NON-NLS-1$
-          IWebBrowser browser = PlatformUI.getWorkbench().getBrowserSupport().getExternalBrowser();
-          browser.openURL(url);
-        } catch(MalformedURLException ex) {
-          log.error("Malformed URL", ex); //$NON-NLS-1$
-        } catch(PartInitException ex) {
-          log.error(ex.getMessage(), ex);
-        }
+    addRemoveOrLink.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      try {
+        URL url = new URL(
+            "http://maven.apache.org/plugins/maven-archetype-plugin/specification/archetype-catalog.html"); //$NON-NLS-1$
+        IWebBrowser browser = PlatformUI.getWorkbench().getBrowserSupport().getExternalBrowser();
+        browser.openURL(url);
+      } catch(MalformedURLException ex) {
+        log.error("Malformed URL", ex); //$NON-NLS-1$
+      } catch(PartInitException ex) {
+        log.error(ex.getMessage(), ex);
       }
-    });
+    }));
 
     archetypesViewer = CheckboxTableViewer.newCheckList(composite, SWT.BORDER | SWT.FULL_SELECTION);
 
@@ -157,19 +156,13 @@ public class MavenArchetypesPreferencePage extends PreferencePage implements IWo
 
     archetypesViewer.setContentProvider(new IStructuredContentProvider() {
 
+      @Override
       public Object[] getElements(Object input) {
         if(input instanceof Collection) {
           return ((Collection<?>) input).toArray();
         }
         return new Object[0];
       }
-
-      public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
-      }
-
-      public void dispose() {
-      }
-
     });
 
     Table table = archetypesViewer.getTable();
@@ -184,96 +177,78 @@ public class MavenArchetypesPreferencePage extends PreferencePage implements IWo
     Button enableAllBtn = new Button(composite, SWT.NONE);
     enableAllBtn.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     enableAllBtn.setText(Messages.MavenArchetypesPreferencePage_btnEnableAll);
-    enableAllBtn.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        toggleRepositories(true);
-      }
-    });
+    enableAllBtn.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> toggleRepositories(true)));
 
     Button disableAllBtn = new Button(composite, SWT.NONE);
     disableAllBtn.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     disableAllBtn.setText(Messages.MavenArchetypesPreferencePage_btnDisableAll);
-    disableAllBtn.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        toggleRepositories(false);
-      }
-    });
+    disableAllBtn.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> toggleRepositories(false)));
 
     Button addLocalButton = new Button(composite, SWT.NONE);
     addLocalButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     addLocalButton.setText(Messages.MavenArchetypesPreferencePage_btnAddLocal);
-    addLocalButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        LocalArchetypeCatalogDialog dialog = new LocalArchetypeCatalogDialog(getShell(), null);
-        if(dialog.open() == Window.OK) {
-          addCatalogFactory(dialog.getArchetypeCatalogFactory());
-        }
+    addLocalButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      LocalArchetypeCatalogDialog dialog = new LocalArchetypeCatalogDialog(getShell(), null);
+      if(dialog.open() == Window.OK) {
+        addCatalogFactory(dialog.getArchetypeCatalogFactory());
       }
-    });
+    }));
 
     Button addRemoteButton = new Button(composite, SWT.NONE);
     addRemoteButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     addRemoteButton.setText(Messages.MavenArchetypesPreferencePage_btnAddRemote);
-    addRemoteButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        RemoteArchetypeCatalogDialog dialog = new RemoteArchetypeCatalogDialog(getShell(), null);
-        if(dialog.open() == Window.OK) {
-          addCatalogFactory(dialog.getArchetypeCatalogFactory());
-        }
+    addRemoteButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      RemoteArchetypeCatalogDialog dialog = new RemoteArchetypeCatalogDialog(getShell(), null);
+      if(dialog.open() == Window.OK) {
+        addCatalogFactory(dialog.getArchetypeCatalogFactory());
       }
-    });
+    }));
 
     final Button editButton = new Button(composite, SWT.NONE);
     editButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     editButton.setEnabled(false);
     editButton.setText(Messages.MavenArchetypesPreferencePage_btnEdit);
-    editButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        ArchetypeCatalogFactory factory = getSelectedArchetypeCatalogFactory();
-        ArchetypeCatalogFactory newFactory = null;
-        if(factory instanceof LocalCatalogFactory) {
-          LocalArchetypeCatalogDialog dialog = new LocalArchetypeCatalogDialog(getShell(), factory);
-          if(dialog.open() == Window.OK) {
-            newFactory = dialog.getArchetypeCatalogFactory();
-          }
-        } else if(factory instanceof RemoteCatalogFactory) {
-          RemoteArchetypeCatalogDialog dialog = new RemoteArchetypeCatalogDialog(getShell(), factory);
-          if(dialog.open() == Window.OK) {
-            newFactory = dialog.getArchetypeCatalogFactory();
-          }
+    editButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      ArchetypeCatalogFactory factory = getSelectedArchetypeCatalogFactory();
+      ArchetypeCatalogFactory newFactory = null;
+      if(factory instanceof LocalCatalogFactory) {
+        LocalArchetypeCatalogDialog dialog = new LocalArchetypeCatalogDialog(getShell(), factory);
+        if(dialog.open() == Window.OK) {
+          newFactory = dialog.getArchetypeCatalogFactory();
         }
-        if(newFactory != null) {
-          int n = archetypeCatalogs.indexOf(factory);
-          if(n > -1) {
-            archetypeCatalogs.set(n, newFactory);
-            archetypesViewer.setInput(archetypeCatalogs);
-            archetypesViewer.setSelection(new StructuredSelection(newFactory), true);
-          }
+      } else if(factory instanceof RemoteCatalogFactory) {
+        RemoteArchetypeCatalogDialog dialog = new RemoteArchetypeCatalogDialog(getShell(), factory);
+        if(dialog.open() == Window.OK) {
+          newFactory = dialog.getArchetypeCatalogFactory();
         }
       }
-    });
+      if(newFactory != null) {
+        int n = archetypeCatalogs.indexOf(factory);
+        if(n > -1) {
+          archetypeCatalogs.set(n, newFactory);
+          archetypesViewer.setInput(archetypeCatalogs);
+          archetypesViewer.setSelection(new StructuredSelection(newFactory), true);
+        }
+      }
+    }));
 
     final Button removeButton = new Button(composite, SWT.NONE);
     removeButton.setEnabled(false);
     removeButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, true));
     removeButton.setText(Messages.MavenArchetypesPreferencePage_btnRemove);
-    removeButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        ArchetypeCatalogFactory factory = getSelectedArchetypeCatalogFactory();
-        archetypeCatalogs.remove(factory);
-        archetypesViewer.setInput(archetypeCatalogs);
-        archetypesViewer.setSelection(null, true);
-      }
-    });
+    removeButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      ArchetypeCatalogFactory factory = getSelectedArchetypeCatalogFactory();
+      archetypeCatalogs.remove(factory);
+      archetypesViewer.setInput(archetypeCatalogs);
+      archetypesViewer.setSelection(null, true);
+    }));
 
-    archetypesViewer.addSelectionChangedListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent event) {
-        if(archetypesViewer.getSelection() instanceof IStructuredSelection) {
-          ArchetypeCatalogFactory factory = getSelectedArchetypeCatalogFactory();
-          boolean isEnabled = factory != null && factory.isEditable();
-          removeButton.setEnabled(isEnabled);
-          editButton.setEnabled(isEnabled);
-        }
+    archetypesViewer.addSelectionChangedListener(event -> {
+      if(archetypesViewer.getSelection() instanceof IStructuredSelection) {
+        ArchetypeCatalogFactory factory = getSelectedArchetypeCatalogFactory();
+        boolean isEnabled = factory != null && factory.isEditable();
+        removeButton.setEnabled(isEnabled);
+        editButton.setEnabled(isEnabled);
       }
     });
 
@@ -281,12 +256,13 @@ public class MavenArchetypesPreferencePage extends PreferencePage implements IWo
       archetypesViewer.refresh(event.getElement(), true);
     });
 
-    archetypeCatalogs = new ArrayList<ArchetypeCatalogFactory>(archetypeManager.getArchetypeCatalogs());
+    archetypeCatalogs = new ArrayList<>(archetypeManager.getArchetypeCatalogs());
     archetypesViewer.setInput(archetypeCatalogs);
     archetypeCatalogs.forEach(a -> archetypesViewer.setChecked(a, a.isEnabled()));
     archetypesViewer.refresh(); // should listen on property changes instead?
 
-    return composite;
+    addField(new BooleanFieldEditor(MavenPreferenceConstants.P_ENABLE_SNAPSHOT_ARCHETYPES, org.eclipse.m2e.core.ui.internal.Messages.MavenProjectWizardArchetypePage_btnSnapshots,
+        getFieldEditorParent()));
   }
 
   protected void toggleRepositories(boolean toggle) {
@@ -360,5 +336,6 @@ public class MavenArchetypesPreferencePage extends PreferencePage implements IWo
     }
 
   }
+
 
 }

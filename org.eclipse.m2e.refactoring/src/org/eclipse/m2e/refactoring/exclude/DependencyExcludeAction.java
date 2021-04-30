@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -50,6 +52,7 @@ public class DependencyExcludeAction implements IActionDelegate {
 
   private ArtifactKey[] keys;
 
+  @Override
   public void run(IAction action) {
     if(keys == null || file == null) {
       return;
@@ -72,6 +75,7 @@ public class DependencyExcludeAction implements IActionDelegate {
     }
   }
 
+  @Override
   public void selectionChanged(IAction action, ISelection selection) {
     file = null;
     keys = null;
@@ -80,7 +84,7 @@ public class DependencyExcludeAction implements IActionDelegate {
     if(selection instanceof IStructuredSelection) {
       IStructuredSelection structuredSelection = (IStructuredSelection) selection;
 
-      List<ArtifactKey> keys = new ArrayList<ArtifactKey>(structuredSelection.size());
+      List<ArtifactKey> keys = new ArrayList<>(structuredSelection.size());
       for(Object selected : structuredSelection.toArray()) {
         if(selected instanceof Artifact) {
           file = getFileFromEditor();

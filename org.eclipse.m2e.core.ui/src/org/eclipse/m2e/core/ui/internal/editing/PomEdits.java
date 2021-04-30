@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2011 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -506,16 +508,18 @@ public class PomEdits {
           }
         }
 
-        try {
-          tuple.getOperation().process(domModel.getDocument());
-        } finally {
-          if(!tuple.isReadOnly()) {
-            undo.endRecording(domModel);
-            if(session != null && domModel.getStructuredDocument() instanceof IDocumentExtension4) {
-              IDocumentExtension4 ext4 = (IDocumentExtension4) domModel.getStructuredDocument();
-              ext4.stopRewriteSession(session);
+        if(domModel != null) {
+          try {
+            tuple.getOperation().process(domModel.getDocument());
+          } finally {
+            if(!tuple.isReadOnly()) {
+              undo.endRecording(domModel);
+              if(session != null && domModel.getStructuredDocument() instanceof IDocumentExtension4) {
+                IDocumentExtension4 ext4 = (IDocumentExtension4) domModel.getStructuredDocument();
+                ext4.stopRewriteSession(session);
+              }
+              domModel.changedModel();
             }
-            domModel.changedModel();
           }
         }
       } finally {
@@ -686,33 +690,27 @@ public class PomEdits {
   }
 
   public static Matcher childEquals(final String elementName, final String matchingValue) {
-    return new Matcher() {
-      public boolean matches(Element child) {
-        String toMatch = PomEdits.getTextValue(PomEdits.findChild(child, elementName));
-        return toMatch != null && toMatch.trim().equals(matchingValue);
-      }
+    return child -> {
+      String toMatch = PomEdits.getTextValue(PomEdits.findChild(child, elementName));
+      return toMatch != null && toMatch.trim().equals(matchingValue);
     };
   }
 
   public static Matcher textEquals(final String matchingValue) {
-    return new Matcher() {
-      public boolean matches(Element child) {
-        String toMatch = PomEdits.getTextValue(child);
-        return toMatch != null && toMatch.trim().equals(matchingValue);
-      }
+    return child -> {
+      String toMatch = PomEdits.getTextValue(child);
+      return toMatch != null && toMatch.trim().equals(matchingValue);
     };
   }
 
   public static Matcher childMissingOrEqual(final String elementName, final String matchingValue) {
-    return new Matcher() {
-      public boolean matches(Element child) {
-        Element match = PomEdits.findChild(child, elementName);
-        if(match == null) {
-          return true;
-        }
-        String toMatch = PomEdits.getTextValue(match);
-        return toMatch != null && toMatch.trim().equals(matchingValue);
+    return child -> {
+      Element match = PomEdits.findChild(child, elementName);
+      if(match == null) {
+        return true;
       }
+      String toMatch = PomEdits.getTextValue(match);
+      return toMatch != null && toMatch.trim().equals(matchingValue);
     };
   }
 

@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2011-2015 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  * 
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -28,23 +30,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.layout.GridDataFactory;
 import org.eclipse.jface.layout.TreeColumnLayout;
-import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.viewers.CellEditor;
 import org.eclipse.jface.viewers.ColumnWeightData;
 import org.eclipse.jface.viewers.ComboBoxCellEditor;
 import org.eclipse.jface.viewers.EditingSupport;
 import org.eclipse.jface.viewers.ILabelProviderListener;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITableLabelProvider;
 import org.eclipse.jface.viewers.ITreeContentProvider;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.viewers.Viewer;
@@ -53,8 +51,7 @@ import org.eclipse.jface.wizard.WizardPage;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CCombo;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.FontMetrics;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
@@ -444,34 +441,30 @@ public class LifecycleMappingPage extends WizardPage {
       }
     });
 
-    treeViewer.addSelectionChangedListener(new ISelectionChangedListener() {
-
-      @SuppressWarnings("synthetic-access")
-      public void selectionChanged(SelectionChangedEvent event) {
-        if(event.getSelection() instanceof IStructuredSelection
-            && ((IStructuredSelection) event.getSelection()).size() == 1) {
-          ILifecycleMappingLabelProvider prov = (ILifecycleMappingLabelProvider) ((IStructuredSelection) event
-              .getSelection()).getFirstElement();
-          if(ignore.contains(prov)) {
-            details.setText(Messages.LifecycleMappingPage_doNotExecutePomDescription);
-            license.setText(EMPTY_STRING);
-          } else if(ignoreAtDefinition.contains(prov)) {
-            details.setText(Messages.LifecycleMappingPage_doNotExecuteParentDescription);
-            license.setText(EMPTY_STRING);
-          } else if(ignoreWorkspace.contains(prov)) {
-            details.setText(Messages.LifecycleMappingPage_doNotExecuteWorkspaceDescription);
-            license.setText(EMPTY_STRING);
-          } else {
-            IMavenDiscoveryProposal proposal = mappingConfiguration.getSelectedProposal(prov.getKey());
-            details.setText(proposal != null ? proposal.getDescription()
-                : mappingConfiguration.getProposals(prov.getKey()).isEmpty()
-                    ? NLS.bind(Messages.LifecycleMappingPage_noMarketplaceEntryDescription, prov.getMavenText())
-                    : EMPTY_STRING);
-            license.setText(proposal == null ? EMPTY_STRING : proposal.getLicense());
-          }
+    treeViewer.addSelectionChangedListener(event -> {
+      if(event.getSelection() instanceof IStructuredSelection
+          && ((IStructuredSelection) event.getSelection()).size() == 1) {
+        ILifecycleMappingLabelProvider prov = (ILifecycleMappingLabelProvider) ((IStructuredSelection) event
+            .getSelection()).getFirstElement();
+        if(ignore.contains(prov)) {
+          details.setText(Messages.LifecycleMappingPage_doNotExecutePomDescription);
+          license.setText(EMPTY_STRING);
+        } else if(ignoreAtDefinition.contains(prov)) {
+          details.setText(Messages.LifecycleMappingPage_doNotExecuteParentDescription);
+          license.setText(EMPTY_STRING);
+        } else if(ignoreWorkspace.contains(prov)) {
+          details.setText(Messages.LifecycleMappingPage_doNotExecuteWorkspaceDescription);
+          license.setText(EMPTY_STRING);
         } else {
-          resetDetails();
+          IMavenDiscoveryProposal proposal = mappingConfiguration.getSelectedProposal(prov.getKey());
+          details.setText(proposal != null ? proposal.getDescription()
+              : mappingConfiguration.getProposals(prov.getKey()).isEmpty()
+                  ? NLS.bind(Messages.LifecycleMappingPage_noMarketplaceEntryDescription, prov.getMavenText())
+                  : EMPTY_STRING);
+          license.setText(proposal == null ? EMPTY_STRING : proposal.getLicense());
         }
+      } else {
+        resetDetails();
       }
     });
 
@@ -499,33 +492,25 @@ public class LifecycleMappingPage extends WizardPage {
     errorCountLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
 
     Button btnNewButton_1 = new Button(composite, SWT.NONE);
-    btnNewButton_1.addSelectionListener(new SelectionAdapter() {
-      @Override
-      @SuppressWarnings("synthetic-access")
-      public void widgetSelected(SelectionEvent e) {
-        mappingConfiguration.clearSelectedProposals();
-        ignore.clear();
-        ignoreAtDefinition.clear();
-        ignoreWorkspace.clear();
-        treeViewer.refresh();
-        getWizard().getContainer().updateButtons(); // needed to enable/disable Finish button
-        updateErrorCount();
-      }
-    });
+    btnNewButton_1.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      mappingConfiguration.clearSelectedProposals();
+      ignore.clear();
+      ignoreAtDefinition.clear();
+      ignoreWorkspace.clear();
+      treeViewer.refresh();
+      getWizard().getContainer().updateButtons(); // needed to enable/disable Finish button
+      updateErrorCount();
+    }));
     btnNewButton_1.setText(Messages.LifecycleMappingPage_deselectAllButton);
 
     autoSelectButton = new Button(composite, SWT.NONE);
-    autoSelectButton.addSelectionListener(new SelectionAdapter() {
-      @Override
-      @SuppressWarnings("synthetic-access")
-      public void widgetSelected(SelectionEvent e) {
-        resetDetails();
-        ignore.clear();
-        ignoreAtDefinition.clear();
-        ignoreWorkspace.clear();
-        discoverProposals();
-      }
-    });
+    autoSelectButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      resetDetails();
+      ignore.clear();
+      ignoreAtDefinition.clear();
+      ignoreWorkspace.clear();
+      discoverProposals();
+    }));
     autoSelectButton.setText(Messages.LifecycleMappingPage_autoSelectButton);
 
     // Provide a reasonable height for the details box 
@@ -581,17 +566,14 @@ public class LifecycleMappingPage extends WizardPage {
     loading = true;
     treeViewer.refresh();
     try {
-      getContainer().run(true, true, new IRunnableWithProgress() {
-        @SuppressWarnings("synthetic-access")
-        public void run(IProgressMonitor monitor) throws InvocationTargetException {
-          mappingConfiguration.clearSelectedProposals();
-          try {
-            LifecycleMappingDiscoveryHelper.discoverProposals(mappingConfiguration, monitor);
-          } catch(CoreException ex) {
-            throw new InvocationTargetException(ex);
-          }
-          mappingConfiguration.autoCompleteMapping();
+      getContainer().run(true, true, monitor -> {
+        mappingConfiguration.clearSelectedProposals();
+        try {
+          LifecycleMappingDiscoveryHelper.discoverProposals(mappingConfiguration, monitor);
+        } catch(CoreException ex) {
+          throw new InvocationTargetException(ex);
         }
+        mappingConfiguration.autoCompleteMapping();
       });
     } catch(InvocationTargetException e) {
       setErrorMessage(e.getMessage());

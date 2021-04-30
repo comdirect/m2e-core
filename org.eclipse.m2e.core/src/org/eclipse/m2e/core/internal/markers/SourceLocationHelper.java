@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -14,6 +16,7 @@ package org.eclipse.m2e.core.internal.markers;
 import java.io.File;
 import java.util.List;
 
+import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.graph.Dependency;
 import org.eclipse.core.resources.IResource;
 
@@ -95,7 +98,7 @@ public class SourceLocationHelper {
   public static SourceLocation findLocation(MavenProject mavenProject, MojoExecutionKey mojoExecutionKey) {
     Plugin plugin = mavenProject.getPlugin(mojoExecutionKey.getGroupId() + ":" + mojoExecutionKey.getArtifactId());
 
-    InputLocation inputLocation = plugin.getLocation(SELF);
+    InputLocation inputLocation = plugin != null ? plugin.getLocation(SELF) : null;
     if(inputLocation == null || inputLocation.getLineNumber() < 0) {
       // Plugin is specified in the maven lifecycle definition, not explicit in current pom or parent pom
       inputLocation = mavenProject.getModel().getLocation(PACKAGING);
@@ -204,10 +207,11 @@ public class SourceLocationHelper {
   private static org.apache.maven.model.Dependency findDependency(List<org.apache.maven.model.Dependency> dependencies,
       Dependency dependency) {
     for(org.apache.maven.model.Dependency mavenDependency : dependencies) {
-      if(mavenDependency.getArtifactId().equals(dependency.getArtifact().getArtifactId())
-          && mavenDependency.getGroupId().equals(dependency.getArtifact().getGroupId())
-          && mavenDependency.getVersion().equals(dependency.getArtifact().getVersion())
-          && eq(mavenDependency.getClassifier(), dependency.getArtifact().getClassifier())) {
+      Artifact dependencyArtifact = dependency.getArtifact();
+      if(mavenDependency.getArtifactId().equals(dependencyArtifact.getArtifactId())
+          && mavenDependency.getGroupId().equals(dependencyArtifact.getGroupId())
+          && eq(mavenDependency.getVersion(), dependencyArtifact.getVersion())
+          && eq(mavenDependency.getClassifier(), dependencyArtifact.getClassifier())) {
         return mavenDependency;
       }
     }

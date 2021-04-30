@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -129,19 +131,15 @@ public class ChangeCreator {
      */
     public LineComparator(IDocument document) {
       this.document = document;
-      this.hashes = new ArrayList<Integer>(Arrays.asList(new Integer[document.getNumberOfLines()]));
+      this.hashes = new ArrayList<>(Arrays.asList(new Integer[document.getNumberOfLines()]));
     }
 
-    /*
-     * @see org.eclipse.compare.rangedifferencer.IRangeComparator#getRangeCount()
-     */
+    @Override
     public int getRangeCount() {
       return document.getNumberOfLines();
     }
 
-    /*
-     * @see org.eclipse.compare.rangedifferencer.IRangeComparator#rangesEqual(int, org.eclipse.compare.rangedifferencer.IRangeComparator, int)
-     */
+    @Override
     public boolean rangesEqual(int thisIndex, IRangeComparator other, int otherIndex) {
       try {
         return getHash(thisIndex).equals(((LineComparator) other).getHash(otherIndex));
@@ -151,9 +149,7 @@ public class ChangeCreator {
       }
     }
 
-    /*
-     * @see org.eclipse.compare.rangedifferencer.IRangeComparator#skipRangeComparison(int, int, org.eclipse.compare.rangedifferencer.IRangeComparator)
-     */
+    @Override
     public boolean skipRangeComparison(int length, int maxLength, IRangeComparator other) {
       return false;
     }

@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -173,24 +175,21 @@ public class ListAdapter extends TranslatorAdapter {
         ((IDOMNode) childElement).addAdapter(this);
       }
       return getElementText(childElement);
-    } else {
-      ModelObjectAdapter existing = (ModelObjectAdapter) ((IDOMNode) childElement)
-          .getExistingAdapter(ModelObjectAdapter.class);
-      if(existing == null) {
-        if(createIfNeeded) {
-          EObject eo = PomFactory.eINSTANCE.create(elementType);
-          existing = new ModelObjectAdapter(resource, eo, childElement);
-          eo.eAdapters().add(existing);
-          ((IDOMNode) childElement).addAdapter(existing);
-          existing.load();
-          return eo;
-        } else {
-          return null;
-        }
-      } else {
-        return existing.getTarget();
-      }
     }
+    ModelObjectAdapter existing = (ModelObjectAdapter) ((IDOMNode) childElement)
+        .getExistingAdapter(ModelObjectAdapter.class);
+    if(existing == null) {
+      if(createIfNeeded) {
+        EObject eo = PomFactory.eINSTANCE.create(elementType);
+        existing = new ModelObjectAdapter(resource, eo, childElement);
+        eo.eAdapters().add(existing);
+        ((IDOMNode) childElement).addAdapter(existing);
+        existing.load();
+        return eo;
+      }
+      return null;
+    }
+    return existing.getTarget();
   }
 
   public boolean isAdapterForType(Object type) {

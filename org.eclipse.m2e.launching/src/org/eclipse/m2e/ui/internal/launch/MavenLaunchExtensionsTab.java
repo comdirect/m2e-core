@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -21,9 +23,7 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.ui.AbstractLaunchConfigurationTab;
-import org.eclipse.jface.viewers.CheckStateChangedEvent;
 import org.eclipse.jface.viewers.CheckboxTableViewer;
-import org.eclipse.jface.viewers.ICheckStateListener;
 import org.eclipse.jface.viewers.ICheckStateProvider;
 import org.eclipse.jface.viewers.ILabelProvider;
 import org.eclipse.jface.viewers.ILabelProviderListener;
@@ -66,18 +66,16 @@ public class MavenLaunchExtensionsTab extends AbstractLaunchConfigurationTab {
     lblMavenLaunchExtensions.setText(Messages.MavenLaunchExtensionsTab_lblExtensions);
 
     checkboxTableViewer = CheckboxTableViewer.newCheckList(composite, SWT.BORDER | SWT.FULL_SELECTION);
-    checkboxTableViewer.addCheckStateListener(new ICheckStateListener() {
-      public void checkStateChanged(CheckStateChangedEvent event) {
-        if(event.getElement() instanceof MavenLaunchParticipantInfo) {
-          MavenLaunchParticipantInfo participant = (MavenLaunchParticipantInfo) event.getElement();
-          if(event.getChecked()) {
-            disabledParticipants.remove(participant.getId());
-          } else {
-            disabledParticipants.add(participant.getId());
-          }
-          setDirty(true);
-          updateLaunchConfigurationDialog();
+    checkboxTableViewer.addCheckStateListener(event -> {
+      if(event.getElement() instanceof MavenLaunchParticipantInfo) {
+        MavenLaunchParticipantInfo participant = (MavenLaunchParticipantInfo) event.getElement();
+        if(event.getChecked()) {
+          disabledParticipants.remove(participant.getId());
+        } else {
+          disabledParticipants.add(participant.getId());
         }
+        setDirty(true);
+        updateLaunchConfigurationDialog();
       }
     });
     Table table = checkboxTableViewer.getTable();
@@ -142,11 +140,10 @@ public class MavenLaunchExtensionsTab extends AbstractLaunchConfigurationTab {
   public void setDefaults(ILaunchConfigurationWorkingCopy configuration) {
   }
 
-  @SuppressWarnings("unchecked")
   public void initializeFrom(ILaunchConfiguration configuration) {
     try {
-      disabledParticipants = new HashSet<String>(configuration.getAttribute(
-          MavenLaunchConstants.ATTR_DISABLED_EXTENSIONS, Collections.EMPTY_SET));
+      disabledParticipants = new HashSet<String>(
+          configuration.getAttribute(MavenLaunchConstants.ATTR_DISABLED_EXTENSIONS, Collections.emptySet()));
     } catch(CoreException ex) {
       disabledParticipants = new HashSet<String>();
     }

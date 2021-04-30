@@ -1,12 +1,16 @@
 /*******************************************************************************
  * Copyright (c) 2016 Red Hat Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
 
 package org.eclipse.m2e.core;
+
+import static org.junit.Assert.assertEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -14,23 +18,19 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.junit.After;
-import org.junit.Test;
-
+import org.apache.maven.project.MavenProject;
+import org.apache.maven.shared.utils.io.FileUtils;
+import org.apache.maven.shared.utils.io.IOUtil;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.NullProgressMonitor;
-
-import org.apache.maven.project.MavenProject;
-import org.apache.maven.shared.utils.io.FileUtils;
-import org.apache.maven.shared.utils.io.IOUtil;
-
-import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.project.IMavenProjectFacade;
 import org.eclipse.m2e.core.project.MavenProjectInfo;
 import org.eclipse.m2e.core.project.ProjectImportConfiguration;
 import org.eclipse.m2e.tests.common.AbstractMavenProjectTestCase;
+import org.junit.After;
+import org.junit.Test;
 
 
 public class MavenBugsTest extends AbstractMavenProjectTestCase {

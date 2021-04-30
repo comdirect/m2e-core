@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -86,17 +88,15 @@ public class MavenPomWizard extends Wizard implements INewWizard {
     final String projectName = artifactPage.getProject();
     final Model model = artifactPage.getModel();
 
-    IRunnableWithProgress op = new IRunnableWithProgress() {
-      public void run(IProgressMonitor monitor) throws InvocationTargetException {
-        monitor.beginTask(Messages.MavenPomWizard_task, 1);
-        try {
-          doFinish(projectName, model, monitor);
-          monitor.worked(1);
-        } catch(CoreException e) {
-          throw new InvocationTargetException(e);
-        } finally {
-          monitor.done();
-        }
+    IRunnableWithProgress op = monitor -> {
+      monitor.beginTask(Messages.MavenPomWizard_task, 1);
+      try {
+        doFinish(projectName, model, monitor);
+        monitor.worked(1);
+      } catch(CoreException e) {
+        throw new InvocationTargetException(e);
+      } finally {
+        monitor.done();
       }
     };
 
@@ -144,13 +144,11 @@ public class MavenPomWizard extends Wizard implements INewWizard {
       MavenModelManager modelManager = MavenPlugin.getMavenModelManager();
       modelManager.createMavenModel(file, model);
 
-      getShell().getDisplay().asyncExec(new Runnable() {
-        public void run() {
-          IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
-          try {
-            IDE.openEditor(page, file, true);
-          } catch(PartInitException e) {
-          }
+      getShell().getDisplay().asyncExec(() -> {
+        IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+        try {
+          IDE.openEditor(page, file, true);
+        } catch(PartInitException e) {
         }
       });
 

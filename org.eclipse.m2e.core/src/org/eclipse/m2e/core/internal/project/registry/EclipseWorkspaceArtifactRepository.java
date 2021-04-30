@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -39,6 +41,8 @@ import org.eclipse.m2e.core.project.IWorkspaceClassifierResolver;
 
 
 public final class EclipseWorkspaceArtifactRepository extends LocalArtifactRepository implements WorkspaceReader {
+  private static final String POM_EXTENSION = "pom"; //$NON-NLS-1$
+
   private static final GenericVersionScheme versionScheme = new GenericVersionScheme();
 
   private final transient ProjectRegistryManager.Context context;
@@ -67,14 +71,17 @@ public final class EclipseWorkspaceArtifactRepository extends LocalArtifactRepos
     if(pom == null || !pom.isAccessible()) {
       return null;
     }
-    if(context.pom != null && pom.equals(context.pom)) {
+    if(context.pom != null && pom.equals(context.pom) && !POM_EXTENSION.equals(extension)) {
       return null;
     }
 
     if(context.resolverConfiguration.shouldResolveWorkspaceProjects()) {
       IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
       IPath file = pom.getLocation();
-      if(!"pom".equals(extension)) { //$NON-NLS-1$
+      if(file == null) {
+        return ProjectRegistryManager.toJavaIoFile(pom);
+      }
+      if(!POM_EXTENSION.equals(extension)) {
         MavenProjectFacade facade = context.state.getProjectFacade(pom);
 
         IWorkspaceClassifierResolver resolver = MavenPlugin.getWorkspaceClassifierResolverManager().getResolver();

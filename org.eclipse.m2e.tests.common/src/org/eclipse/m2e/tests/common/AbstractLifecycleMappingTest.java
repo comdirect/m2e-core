@@ -1,15 +1,19 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
  *******************************************************************************/
 
 package org.eclipse.m2e.tests.common;
+
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -18,6 +22,9 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import org.junit.After;
+import org.junit.Before;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
@@ -51,7 +58,8 @@ public abstract class AbstractLifecycleMappingTest extends AbstractMavenProjectT
   protected IProjectConfigurationManager projectConfigurationManager;
 
   @Override
-  protected void setUp() throws Exception {
+  @Before
+  public void setUp() throws Exception {
     super.setUp();
 
     mavenProjectManager = MavenPlugin.getMavenProjectRegistry();
@@ -59,7 +67,8 @@ public abstract class AbstractLifecycleMappingTest extends AbstractMavenProjectT
   }
 
   @Override
-  protected void tearDown() throws Exception {
+  @After
+  public void tearDown() throws Exception {
     projectConfigurationManager = null;
     mavenProjectManager = null;
 

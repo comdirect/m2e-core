@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -12,10 +14,8 @@
 package org.eclipse.m2e.core.ui.internal.wizards;
 
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -89,11 +89,8 @@ public class ResolverConfigurationComponent extends ExpandableComposite {
     resolveWorkspaceProjects = new Button(advancedComposite, SWT.CHECK);
     resolveWorkspaceProjects.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false, 2, 1));
     resolveWorkspaceProjects.setText(Messages.resolverConfigurationResolveWorkspaceProjects);
-    resolveWorkspaceProjects.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        resolverConfiguration.setResolveWorkspaceProjects(resolveWorkspaceProjects.getSelection());
-      }
-    });
+    resolveWorkspaceProjects.addSelectionListener(SelectionListener.widgetSelectedAdapter(
+        e -> resolverConfiguration.setResolveWorkspaceProjects(resolveWorkspaceProjects.getSelection())));
 
     Label profilesLabel = new Label(advancedComposite, SWT.NONE);
     profilesLabel.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
@@ -101,11 +98,7 @@ public class ResolverConfigurationComponent extends ExpandableComposite {
 
     profiles = new Text(advancedComposite, SWT.BORDER);
     profiles.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-    profiles.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        resolverConfiguration.setSelectedProfiles(profiles.getText());
-      }
-    });
+    profiles.addModifyListener(e -> resolverConfiguration.setSelectedProfiles(profiles.getText()));
 
     if(enableProjectNameTemplate) {
       Label templateLabel = new Label(advancedComposite, SWT.NONE);
@@ -116,11 +109,7 @@ public class ResolverConfigurationComponent extends ExpandableComposite {
       template.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
       template.setToolTipText(Messages.resolverConfigurationTemplateDescription);
       template.setItems(DEFAULT_NAME_TEMPLATES);
-      template.addModifyListener(new ModifyListener() {
-        public void modifyText(ModifyEvent e) {
-          propectImportConfiguration.setProjectNameTemplate(template.getText());
-        }
-      });
+      template.addModifyListener(e -> propectImportConfiguration.setProjectNameTemplate(template.getText()));
     }
 
     loadData();

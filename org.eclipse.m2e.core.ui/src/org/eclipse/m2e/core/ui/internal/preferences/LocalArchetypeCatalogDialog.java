@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2018 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -24,10 +26,8 @@ import org.eclipse.jface.dialogs.IDialogSettings;
 import org.eclipse.jface.dialogs.TitleAreaDialog;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
@@ -118,17 +118,15 @@ public class LocalArchetypeCatalogDialog extends TitleAreaDialog {
 
     Button browseButton = new Button(composite, SWT.NONE);
     browseButton.setText(Messages.LocalArchetypeCatalogDialog_btnBrowse);
-    browseButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        FileDialog dialog = new FileDialog(getShell());
-        dialog.setText(Messages.LocalArchetypeCatalogDialog_dialog_title);
-        String location = dialog.open();
-        if(location != null) {
-          catalogLocationCombo.setText(location);
-          update();
-        }
+    browseButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      FileDialog dialog = new FileDialog(getShell());
+      dialog.setText(Messages.LocalArchetypeCatalogDialog_dialog_title);
+      String location = dialog.open();
+      if(location != null) {
+        catalogLocationCombo.setText(location);
+        update();
       }
-    });
+    }));
     setButtonLayoutData(browseButton);
 
     Label catalogDescriptionLabel = new Label(composite, SWT.NONE);
@@ -142,11 +140,7 @@ public class LocalArchetypeCatalogDialog extends TitleAreaDialog {
       catalogDescriptionText.setText(archetypeCatalogFactory.getDescription());
     }
 
-    ModifyListener modifyListener = new ModifyListener() {
-      public void modifyText(final ModifyEvent e) {
-        update();
-      }
-    };
+    ModifyListener modifyListener = e -> update();
     catalogLocationCombo.addModifyListener(modifyListener);
     catalogDescriptionText.addModifyListener(modifyListener);
 

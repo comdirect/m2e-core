@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -67,11 +69,7 @@ public class ShowDependencyHierarchyAction extends ActionDelegate {
           final IEditorPart editor = OpenPomAction.openEditor(projectKey.getGroupId(), //
               projectKey.getArtifactId(), projectKey.getVersion(), monitor);
           if(editor instanceof MavenPomEditor) {
-            Display.getDefault().asyncExec(new Runnable() {
-              public void run() {
-                ((MavenPomEditor) editor).showDependencyHierarchy(artifactKey);
-              }
-            });
+            Display.getDefault().asyncExec(() -> ((MavenPomEditor) editor).showDependencyHierarchy(artifactKey));
           }
           return Status.OK_STATUS;
         }

@@ -1,9 +1,11 @@
 /*******************************************************************************
- * Copyright (c) 2013 Red Hat, Inc.
+ * Copyright (c) 2013, 2019 Red Hat, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Red Hat, Inc. - initial API and implementation
@@ -11,7 +13,7 @@
 
 package org.eclipse.m2e.core.archetype;
 
-import org.codehaus.plexus.util.StringUtils;
+import java.util.Objects;
 
 import org.apache.maven.archetype.catalog.Archetype;
 
@@ -37,9 +39,9 @@ public class ArchetypeUtil {
       return false;
     }
 
-    return StringUtils.equals(one.getGroupId(), another.getGroupId())
-        && StringUtils.equals(one.getArtifactId(), another.getArtifactId())
-        && StringUtils.equals(one.getVersion(), another.getVersion());
+    return Objects.equals(one.getGroupId(), another.getGroupId())
+        && Objects.equals(one.getArtifactId(), another.getArtifactId())
+        && Objects.equals(one.getVersion(), another.getVersion());
   }
 
   /**

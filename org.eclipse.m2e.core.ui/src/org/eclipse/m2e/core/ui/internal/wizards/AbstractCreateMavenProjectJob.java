@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2015 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -54,7 +56,7 @@ public abstract class AbstractCreateMavenProjectJob extends WorkspaceJob {
   }
 
   @Override
-  public final IStatus runInWorkspace(IProgressMonitor monitor) throws CoreException {
+  public final IStatus runInWorkspace(IProgressMonitor monitor) {
     setProperty(IProgressConstants.ACTION_PROPERTY, new OpenMavenConsoleAction());
     createdProjects = null;
     AbstractCreateMavenProjectsOperation op = new AbstractCreateMavenProjectsOperation(workingSets) {
@@ -71,8 +73,6 @@ public abstract class AbstractCreateMavenProjectJob extends WorkspaceJob {
       }
     } catch(InvocationTargetException e) {
       return AbstractCreateMavenProjectsOperation.toStatus(e);
-    } catch(InterruptedException e) {
-      return Status.CANCEL_STATUS;
     }
     return Status.OK_STATUS;
   }

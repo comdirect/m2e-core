@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -80,13 +82,10 @@ public class RepositoryViewLabelProvider extends LabelProvider implements IStyle
   }
 
   public Color getForeground(Object element) {
-    if(element instanceof RepositoryNode) {
-      if(((RepositoryNode) element).isEnabledIndex()) {
-        return Display.getDefault().getSystemColor(SWT.COLOR_BLACK);
-      }
-      return Display.getDefault().getSystemColor(SWT.COLOR_DARK_GRAY);
+    if(element instanceof RepositoryNode && !((RepositoryNode) element).isEnabledIndex()) {
+        return Display.getDefault().getSystemColor(SWT.COLOR_DARK_GRAY);
     }
-    return Display.getDefault().getSystemColor(SWT.COLOR_BLACK);
+    return null;
   }
 
   public Font getFont(Object element) {

@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -11,6 +13,8 @@
 
 package org.eclipse.m2e.core.ui.internal.wizards;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -27,10 +31,7 @@ import org.eclipse.core.runtime.Path;
 import org.eclipse.jface.window.Window;
 import org.eclipse.jface.wizard.IWizardPage;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -103,11 +104,7 @@ public class MavenModuleWizardParentPage extends AbstractMavenWizardPage {
     simpleProject.setText(Messages.wizardProjectPageProjectSimpleProject);
     simpleProject.setData("name", "simpleProjectButton"); //$NON-NLS-1$ //$NON-NLS-2$
     simpleProject.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false, 3, 1));
-    simpleProject.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        validate();
-      }
-    });
+    simpleProject.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> validate()));
 
     Label nameLabel = new Label(container, SWT.NONE);
     GridData gd_nameLabel = new GridData();
@@ -119,11 +116,7 @@ public class MavenModuleWizardParentPage extends AbstractMavenWizardPage {
     GridData gd_moduleNameCombo = new GridData(SWT.FILL, SWT.TOP, true, false, 2, 1);
     gd_moduleNameCombo.verticalIndent = 10;
     moduleNameCombo.setLayoutData(gd_moduleNameCombo);
-    moduleNameCombo.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        validate();
-      }
-    });
+    moduleNameCombo.addModifyListener(e -> validate());
     addFieldWithHistory("moduleName", moduleNameCombo); //$NON-NLS-1$
 
     Label parentLabel = new Label(container, SWT.NONE);
@@ -135,15 +128,13 @@ public class MavenModuleWizardParentPage extends AbstractMavenWizardPage {
 
     Button browseButton = new Button(container, SWT.NONE);
     browseButton.setText(Messages.wizardModulePageParentBrowse);
-    browseButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        MavenProjectSelectionDialog dialog = new MavenProjectSelectionDialog(getShell());
-        if(dialog.open() == Window.OK) {
-          setParent(dialog.getFirstResult());
-          validate();
-        }
+    browseButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      MavenProjectSelectionDialog dialog = new MavenProjectSelectionDialog(getShell());
+      if(dialog.open() == Window.OK) {
+        setParent(dialog.getFirstResult());
+        validate();
       }
-    });
+    }));
 
     this.workingSetGroup = new WorkingSetGroup(container, workingSets, getShell());
 
@@ -228,11 +219,11 @@ public class MavenModuleWizardParentPage extends AbstractMavenWizardPage {
       parentObject = pom;
       parentContainer = pom.getParent();
 
-      try {
-        parentModel = MavenPlugin.getMavenModelManager().readMavenModel(pom);
+      try (InputStream pomStream = pom.getContents()) {
+        parentModel = MavenPlugin.getMavenModelManager().readMavenModel(pomStream);
         validateParent();
         parentProjectText.setText(parentModel.getArtifactId());
-      } catch(CoreException e) {
+      } catch(CoreException | IOException e) {
         log.error("Error loading POM: " + e.getMessage(), e); //$NON-NLS-1$
       }
     }

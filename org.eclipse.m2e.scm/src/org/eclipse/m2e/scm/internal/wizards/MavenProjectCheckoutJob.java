@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2013 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -170,39 +172,34 @@ public abstract class MavenProjectCheckoutJob extends WorkspaceJob {
 
           String[] projectFiles = projectScanner.getIncludedFiles();
           if(projectFiles != null && projectFiles.length > 0) {
-            PlatformUI.getWorkbench().getDisplay().asyncExec(new Runnable() {
-              public void run() {
-                boolean res = MessageDialog.openConfirm(PlatformUI.getWorkbench().getDisplay().getActiveShell(), //
-                    Messages.MavenProjectCheckoutJob_confirm_title, //
-                    Messages.MavenProjectCheckoutJob_confirm_message);
-                if(res) {
-                  IWizard wizard = new ExternalProjectImportWizard(collectedLocations.get(0));
-                  WizardDialog dialog = new WizardDialog(PlatformUI.getWorkbench().getDisplay().getActiveShell(),
-                      wizard);
-                  dialog.open();
-                } else {
-                  cleanup(collectedLocations);
-                }
+            PlatformUI.getWorkbench().getDisplay().asyncExec(() -> {
+              boolean res = MessageDialog.openConfirm(PlatformUI.getWorkbench().getDisplay().getActiveShell(), //
+                  Messages.MavenProjectCheckoutJob_confirm_title, //
+                  Messages.MavenProjectCheckoutJob_confirm_message);
+              if(res) {
+                IWizard wizard = new ExternalProjectImportWizard(collectedLocations.get(0));
+                WizardDialog dialog = new WizardDialog(PlatformUI.getWorkbench().getDisplay().getActiveShell(), wizard);
+                dialog.open();
+              } else {
+                cleanup(collectedLocations);
               }
             });
             return;
           }
 
-          PlatformUI.getWorkbench().getDisplay().syncExec(new Runnable() {
-            public void run() {
-              boolean res = MessageDialog.openConfirm(PlatformUI.getWorkbench().getDisplay().getActiveShell(), //
-                  Messages.MavenProjectCheckoutJob_confirm2_title, //
-                  Messages.MavenProjectCheckoutJob_confirm2_message);
-              if(res) {
-                Clipboard clipboard = new Clipboard(PlatformUI.getWorkbench().getDisplay());
-                clipboard.setContents(new Object[] {location}, new Transfer[] {TextTransfer.getInstance()});
+          PlatformUI.getWorkbench().getDisplay().syncExec(() -> {
+            boolean res = MessageDialog.openConfirm(PlatformUI.getWorkbench().getDisplay().getActiveShell(), //
+                Messages.MavenProjectCheckoutJob_confirm2_title, //
+                Messages.MavenProjectCheckoutJob_confirm2_message);
+            if(res) {
+              Clipboard clipboard = new Clipboard(PlatformUI.getWorkbench().getDisplay());
+              clipboard.setContents(new Object[] {location}, new Transfer[] {TextTransfer.getInstance()});
 
-                NewProjectAction newProjectAction = new NewProjectAction(PlatformUI.getWorkbench()
-                    .getActiveWorkbenchWindow());
-                newProjectAction.run();
-              } else {
-                cleanup(collectedLocations);
-              }
+              NewProjectAction newProjectAction = new NewProjectAction(
+                  PlatformUI.getWorkbench().getActiveWorkbenchWindow());
+              newProjectAction.run();
+            } else {
+              cleanup(collectedLocations);
             }
           });
           return;
@@ -220,15 +217,13 @@ public abstract class MavenProjectCheckoutJob extends WorkspaceJob {
         job.schedule();
 
       } else {
-        PlatformUI.getWorkbench().getDisplay().asyncExec(new Runnable() {
-          public void run() {
-            MavenImportWizard wizard = new MavenImportWizard(configuration, collectedLocations);
-            wizard.setBasedirRemameRequired(true);
-            WizardDialog dialog = new WizardDialog(PlatformUI.getWorkbench().getDisplay().getActiveShell(), wizard);
-            int res = dialog.open();
-            if(res == Window.CANCEL) {
-              cleanup(collectedLocations);
-            }
+        PlatformUI.getWorkbench().getDisplay().asyncExec(() -> {
+          MavenImportWizard wizard = new MavenImportWizard(configuration, collectedLocations);
+          wizard.setBasedirRemameRequired(true);
+          WizardDialog dialog = new WizardDialog(PlatformUI.getWorkbench().getDisplay().getActiveShell(), wizard);
+          int res = dialog.open();
+          if(res == Window.CANCEL) {
+            cleanup(collectedLocations);
           }
         });
       }

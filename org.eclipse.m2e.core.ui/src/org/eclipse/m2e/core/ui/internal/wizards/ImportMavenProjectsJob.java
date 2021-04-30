@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2010-2015 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation (in o.e.m.c.u.i.w.MavenImportWizard)
@@ -57,7 +59,7 @@ public class ImportMavenProjectsJob extends WorkspaceJob {
   }
 
   @Override
-  public IStatus runInWorkspace(final IProgressMonitor monitor) throws CoreException {
+  public IStatus runInWorkspace(final IProgressMonitor monitor) {
 
     final AbstractCreateMavenProjectsOperation importOperation = new AbstractCreateMavenProjectsOperation() {
 
@@ -80,8 +82,6 @@ public class ImportMavenProjectsJob extends WorkspaceJob {
       discoveryJob.schedule();
     } catch(InvocationTargetException e) {
       return AbstractCreateMavenProjectsOperation.toStatus(e);
-    } catch(InterruptedException e) {
-      return Status.CANCEL_STATUS;
     }
     return Status.OK_STATUS;
   }

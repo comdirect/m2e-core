@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2015 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -26,13 +28,10 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.jobs.IJobChangeEvent;
 import org.eclipse.core.runtime.jobs.JobChangeAdapter;
 import org.eclipse.jface.dialogs.MessageDialog;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.wizard.IWizardPage;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
@@ -105,11 +104,7 @@ public class MavenProjectWizard extends AbstractMavenProjectWizard implements IN
         simpleProject = new Button(container, SWT.CHECK);
         simpleProject.setText(Messages.wizardProjectPageProjectSimpleProject);
         simpleProject.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false, 3, 1));
-        simpleProject.addSelectionListener(new SelectionAdapter() {
-          public void widgetSelected(SelectionEvent e) {
-            validate();
-          }
-        });
+        simpleProject.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> validate()));
 
         Label label = new Label(container, SWT.NONE);
         GridData labelData = new GridData(SWT.FILL, SWT.TOP, false, false, 3, 1);
@@ -138,21 +133,17 @@ public class MavenProjectWizard extends AbstractMavenProjectWizard implements IN
   public void createPageControls(Composite pageContainer) {
     super.createPageControls(pageContainer);
 
-    simpleProject.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        boolean isSimpleproject = simpleProject.getSelection();
-        archetypePage.setUsed(!isSimpleproject);
-        parametersPage.setUsed(!isSimpleproject);
-        artifactPage.setUsed(isSimpleproject);
-        getContainer().updateButtons();
-      }
-    });
+    simpleProject.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      boolean isSimpleproject = simpleProject.getSelection();
+      archetypePage.setUsed(!isSimpleproject);
+      parametersPage.setUsed(!isSimpleproject);
+      artifactPage.setUsed(isSimpleproject);
+      getContainer().updateButtons();
+    }));
 
-    archetypePage.addArchetypeSelectionListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent selectionchangedevent) {
-        parametersPage.setArchetype(archetypePage.getArchetype());
-        getContainer().updateButtons();
-      }
+    archetypePage.addArchetypeSelectionListener(selectionchangedevent -> {
+      parametersPage.setArchetype(archetypePage.getArchetype());
+      getContainer().updateButtons();
     });
 
 //    locationPage.addProjectNameListener(new ModifyListener() {
@@ -251,12 +242,8 @@ public class MavenProjectWizard extends AbstractMavenProjectWizard implements IN
       public void done(IJobChangeEvent event) {
         final IStatus result = event.getResult();
         if(!result.isOK()) {
-          Display.getDefault().asyncExec(new Runnable() {
-            public void run() {
-              MessageDialog.openError(getShell(), //
-                  NLS.bind(Messages.wizardProjectJobFailed, projectName), result.getMessage());
-            }
-          });
+          Display.getDefault().asyncExec(() -> MessageDialog.openError(getShell(), //
+              NLS.bind(Messages.wizardProjectJobFailed, projectName), result.getMessage()));
         }
 
         MappingDiscoveryJob discoveryJob = new MappingDiscoveryJob(job.getCreatedProjects());

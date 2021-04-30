@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2014 Sonatype, Inc. and others
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -24,8 +26,6 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.ibm.icu.lang.UCharacter;
-
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
@@ -38,10 +38,7 @@ import org.eclipse.jface.viewers.TextCellEditor;
 import org.eclipse.jface.wizard.IWizardPage;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
@@ -141,11 +138,7 @@ public class MavenProjectWizardArchetypeParametersPage extends AbstractMavenWiza
     validate();
 
     createAdvancedSettings(composite, new GridData(SWT.FILL, SWT.TOP, false, false, 3, 1));
-    resolverConfigurationComponent.setModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        validate();
-      }
-    });
+    resolverConfigurationComponent.setModifyListener(e -> validate());
 
     setControl(composite);
 
@@ -164,11 +157,9 @@ public class MavenProjectWizardArchetypeParametersPage extends AbstractMavenWiza
     groupIdCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
     addFieldWithHistory("groupId", groupIdCombo); //$NON-NLS-1$
     groupIdCombo.setData("name", "groupId"); //$NON-NLS-1$ //$NON-NLS-2$
-    groupIdCombo.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        updateJavaPackage();
-        validate();
-      }
+    groupIdCombo.addModifyListener(e -> {
+      updateJavaPackage();
+      validate();
     });
 
     Label artifactIdLabel = new Label(parent, SWT.NONE);
@@ -178,11 +169,9 @@ public class MavenProjectWizardArchetypeParametersPage extends AbstractMavenWiza
     artifactIdCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 2, 1));
     addFieldWithHistory("artifactId", artifactIdCombo); //$NON-NLS-1$
     artifactIdCombo.setData("name", "artifactId"); //$NON-NLS-1$ //$NON-NLS-2$
-    artifactIdCombo.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        updateJavaPackage();
-        validate();
-      }
+    artifactIdCombo.addModifyListener(e -> {
+      updateJavaPackage();
+      validate();
     });
 
     Label versionLabel = new Label(parent, SWT.NONE);
@@ -194,11 +183,7 @@ public class MavenProjectWizardArchetypeParametersPage extends AbstractMavenWiza
     versionCombo.setLayoutData(gd_versionCombo);
     versionCombo.setText(DEFAULT_VERSION);
     addFieldWithHistory("version", versionCombo); //$NON-NLS-1$
-    versionCombo.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        validate();
-      }
-    });
+    versionCombo.addModifyListener(e -> validate());
 
     Label packageLabel = new Label(parent, SWT.NONE);
     packageLabel.setText(Messages.artifactComponentPackage);
@@ -207,13 +192,11 @@ public class MavenProjectWizardArchetypeParametersPage extends AbstractMavenWiza
     packageCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 2, 1));
     packageCombo.setData("name", "package"); //$NON-NLS-1$ //$NON-NLS-2$
     addFieldWithHistory("package", packageCombo); //$NON-NLS-1$
-    packageCombo.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        if(!packageCustomized && !packageCombo.getText().equals(getDefaultJavaPackage())) {
-          packageCustomized = true;
-        }
-        validate();
+    packageCombo.addModifyListener(e -> {
+      if(!packageCustomized && !packageCombo.getText().equals(getDefaultJavaPackage())) {
+        packageCustomized = true;
       }
+      validate();
     });
   }
 
@@ -266,32 +249,26 @@ public class MavenProjectWizardArchetypeParametersPage extends AbstractMavenWiza
     Button addButton = new Button(composite, SWT.NONE);
     addButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     addButton.setText(org.eclipse.m2e.core.ui.internal.Messages.MavenProjectWizardArchetypeParametersPage_btnAdd);
-    addButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        TableItem item = addTableItem("?", "?"); //$NON-NLS-1$ //$NON-NLS-2$
-        propertiesTable.setFocus();
-        propertiesViewer.editElement(item, KEY_INDEX);
-        propertiesViewer.setSelection(new StructuredSelection(item.getData()));
-      }
-    });
+    addButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      TableItem item = addTableItem("?", "?"); //$NON-NLS-1$ //$NON-NLS-2$
+      propertiesTable.setFocus();
+      propertiesViewer.editElement(item, KEY_INDEX);
+      propertiesViewer.setSelection(new StructuredSelection(item.getData()));
+    }));
 
     removeButton = new Button(composite, SWT.NONE);
     removeButton.setLayoutData(new GridData(SWT.LEFT, SWT.TOP, false, false));
     removeButton.setText(org.eclipse.m2e.core.ui.internal.Messages.MavenProjectWizardArchetypeParametersPage_btnRemove);
     removeButton.setEnabled(propertiesTable.getSelectionCount() > 0);
-    removeButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        propertiesTable.remove(propertiesTable.getSelectionIndices());
-        removeButton.setEnabled(propertiesTable.getSelectionCount() > 0);
-        validate();
-      }
-    });
+    removeButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      propertiesTable.remove(propertiesTable.getSelectionIndices());
+      removeButton.setEnabled(propertiesTable.getSelectionCount() > 0);
+      validate();
+    }));
 
-    propertiesTable.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        removeButton.setEnabled(propertiesTable.getSelectionCount() > 0);
-      }
-    });
+    propertiesTable.addSelectionListener(
+        SelectionListener.widgetSelectedAdapter(e -> removeButton.setEnabled(propertiesTable.getSelectionCount() > 0)
+      ));
   }
 
   /**
@@ -641,7 +618,7 @@ public class MavenProjectWizardArchetypeParametersPage extends AbstractMavenWiza
         isFirst = false;
       } else {
         if(isFirst) {
-          if(UCharacter.isJavaIdentifierStart(c)) {
+          if(Character.isJavaIdentifierStart(c)) {
             pkg.append(c);
             isFirst = false;
           }
@@ -649,7 +626,7 @@ public class MavenProjectWizardArchetypeParametersPage extends AbstractMavenWiza
           if(c == '.') {
             pkg.append('.');
             isFirst = true;
-          } else if(UCharacter.isJavaIdentifierPart(c)) {
+          } else if(Character.isJavaIdentifierPart(c)) {
             pkg.append(c);
           }
         }

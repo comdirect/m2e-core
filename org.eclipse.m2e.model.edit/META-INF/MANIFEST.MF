@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-Name: %Bundle-Name
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-Vendor: %Bundle-Vendor
-Bundle-Version: 1.12.0.qualifier
+Bundle-Version: 1.16.0.qualifier
 Bundle-ManifestVersion: 2
 Bundle-SymbolicName: org.eclipse.m2e.model.edit;singleton:=true
 Require-Bundle: org.eclipse.core.runtime,
@@ -11,15 +11,14 @@ Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.emf.ecore.xmi;visibility:=reexport,
  org.eclipse.emf.edit;visibility:=reexport,
  org.eclipse.emf.ecore.edit;visibility:=reexport,
+ org.eclipse.wst.common.uriresolver;visibility:=reexport,
  org.eclipse.wst.common.emf;visibility:=reexport,
  org.eclipse.wst.sse.core;visibility:=reexport,
- org.eclipse.wst.xml.core;visibility:=reexport,
- org.eclipse.wst.xsd.core;visibility:=reexport,
- org.eclipse.jem.util;visibility:=reexport,
- com.ibm.icu;bundle-version="4.0.1"
+ org.eclipse.wst.xml.core;visibility:=reexport
 Bundle-ActivationPolicy: lazy
 Export-Package: org.eclipse.m2e.model.edit.pom;x-internal:=true,
  org.eclipse.m2e.model.edit.pom.impl;x-internal:=true,
  org.eclipse.m2e.model.edit.pom.provider;x-internal:=true,
  org.eclipse.m2e.model.edit.pom.util;x-internal:=true
 Bundle-ClassPath: .
+Automatic-Module-Name: org.eclipse.m2e.model.edit

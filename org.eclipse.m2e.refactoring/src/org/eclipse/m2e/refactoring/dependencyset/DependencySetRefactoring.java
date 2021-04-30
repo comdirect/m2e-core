@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -55,33 +57,25 @@ public class DependencySetRefactoring extends Refactoring {
     this.keys = keys;
   }
 
-  /* (non-Javadoc)
-   * @see org.eclipse.ltk.core.refactoring.Refactoring#getName()
-   */
+  @Override
   public String getName() {
     // TODO Auto-generated method stub
     return "Set dependency version";
   }
 
-  /* (non-Javadoc)
-   * @see org.eclipse.ltk.core.refactoring.Refactoring#checkInitialConditions(org.eclipse.core.runtime.IProgressMonitor)
-   */
-  public RefactoringStatus checkInitialConditions(IProgressMonitor pm) throws CoreException, OperationCanceledException {
+  @Override
+  public RefactoringStatus checkInitialConditions(IProgressMonitor pm) throws OperationCanceledException {
     return new RefactoringStatus();
   }
 
-  /* (non-Javadoc)
-   * @see org.eclipse.ltk.core.refactoring.Refactoring#checkFinalConditions(org.eclipse.core.runtime.IProgressMonitor)
-   */
-  public RefactoringStatus checkFinalConditions(IProgressMonitor pm) throws CoreException, OperationCanceledException {
+  @Override
+  public RefactoringStatus checkFinalConditions(IProgressMonitor pm) throws OperationCanceledException {
     return new RefactoringStatus();
   }
 
-  /* (non-Javadoc)
-   * @see org.eclipse.ltk.core.refactoring.Refactoring#createChange(org.eclipse.core.runtime.IProgressMonitor)
-   */
+  @Override
   public Change createChange(IProgressMonitor pm) throws CoreException, OperationCanceledException {
-    List<Operation> operations = new ArrayList<Operation>();
+    List<Operation> operations = new ArrayList<>();
     for(ArtifactKey key : keys) {
       operations.add(new OneDependency(key));
     }
@@ -103,9 +97,7 @@ public class DependencySetRefactoring extends Refactoring {
       this.version = key.getVersion();
     }
 
-    /* (non-Javadoc)
-     * @see org.eclipse.m2e.core.ui.internal.editing.PomEdits.Operation#process(org.w3c.dom.Document)
-     */
+    @Override
     public void process(Document document) {
       //TODO handle activated profiles?
       Element deps = findChild(document.getDocumentElement(), DEPENDENCIES);

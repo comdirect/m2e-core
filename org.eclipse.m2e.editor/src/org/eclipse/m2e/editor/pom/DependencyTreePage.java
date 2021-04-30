@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -38,14 +40,15 @@ import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.action.ToolBarManager;
 import org.eclipse.jface.dialogs.IMessageProvider;
+import org.eclipse.jface.resource.JFaceResources;
+import org.eclipse.jface.util.IPropertyChangeListener;
+import org.eclipse.jface.util.PropertyChangeEvent;
 import org.eclipse.jface.viewers.IColorProvider;
-import org.eclipse.jface.viewers.IOpenListener;
 import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredContentProvider;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.LabelProvider;
-import org.eclipse.jface.viewers.OpenEvent;
 import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TableViewer;
@@ -59,8 +62,6 @@ import org.eclipse.swt.custom.SashForm;
 import org.eclipse.swt.events.FocusAdapter;
 import org.eclipse.swt.events.FocusEvent;
 import org.eclipse.swt.events.FocusListener;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.FillLayout;
@@ -81,6 +82,7 @@ import org.eclipse.ui.forms.widgets.ScrolledForm;
 import org.eclipse.ui.forms.widgets.Section;
 import org.eclipse.ui.progress.UIJob;
 import org.eclipse.ui.progress.WorkbenchJob;
+import org.eclipse.ui.services.IDisposable;
 
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
@@ -126,7 +128,7 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
 
   ArrayList<DependencyNode> dependencyNodes = new ArrayList<DependencyNode>();
 
-  Color searchHighlightColor;
+  Highlighter highlighter;
 
   MavenProject mavenProject;
 
@@ -148,8 +150,6 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
 
     FormToolkit formToolkit = managedForm.getToolkit();
 
-    searchHighlightColor = new Color(Display.getDefault(), 242, 218, 170);
-
     ScrolledForm form = managedForm.getForm();
     form.setText(formatFormTitle());
     form.setExpandHorizontal(true);
@@ -161,6 +161,8 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
     SashForm sashForm = new SashForm(body, SWT.NONE);
     formToolkit.adapt(sashForm);
     formToolkit.adapt(sashForm, true, true);
+
+    highlighter = new Highlighter();
 
     createHierarchySection(sashForm, formToolkit);
 
@@ -236,33 +238,28 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
             }
           });
 
-          getPartControl().getDisplay().syncExec(new Runnable() {
-            public void run() {
-              FormUtils.setMessage(getManagedForm().getForm(), null, IMessageProvider.NONE);
-              if(treeViewer.getTree().isDisposed()) {
-                return;
-              }
-
-              treeViewer.setInput(dependencyNode);
-              treeViewer.getTree().setRedraw(false);
-              try {
-                treeViewer.expandAll();
-              } finally {
-                treeViewer.getTree().setRedraw(true);
-              }
-              if(listViewer.getTable().isDisposed()) {
-                return;
-              }
-              listViewer.setInput(mavenProject);
+          getPartControl().getDisplay().syncExec(() -> {
+            FormUtils.setMessage(getManagedForm().getForm(), null, IMessageProvider.NONE);
+            if(treeViewer.getTree().isDisposed()) {
+              return;
             }
+
+            treeViewer.setInput(dependencyNode);
+            treeViewer.getTree().setRedraw(false);
+            try {
+              treeViewer.expandAll();
+            } finally {
+              treeViewer.getTree().setRedraw(true);
+            }
+            if(listViewer.getTable().isDisposed()) {
+              return;
+            }
+            listViewer.setInput(mavenProject);
           });
         } catch(final CoreException ex) {
           log.error(ex.getMessage(), ex);
-          getPartControl().getDisplay().asyncExec(new Runnable() {
-            public void run() {
-              FormUtils.setMessage(getManagedForm().getForm(), ex.getMessage(), IMessageProvider.ERROR);
-            }
-          });
+          getPartControl().getDisplay().asyncExec(
+              () -> FormUtils.setMessage(getManagedForm().getForm(), ex.getMessage(), IMessageProvider.ERROR));
         }
 
         return Status.OK_STATUS;
@@ -294,26 +291,22 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
     treeViewer.setContentProvider(new DependencyTreeContentProvider());
     treeViewer.setLabelProvider(treeLabelProvider);
 
-    treeViewer.addSelectionChangedListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent event) {
-        if(!isSettingSelection) {
-          isSettingSelection = true;
-          IStructuredSelection selection = (IStructuredSelection) treeViewer.getSelection();
-          selectListElements(new DependencyNodeMatcher(selection));
-          isSettingSelection = false;
-        }
+    treeViewer.addSelectionChangedListener(event -> {
+      if(!isSettingSelection) {
+        isSettingSelection = true;
+        IStructuredSelection selection = (IStructuredSelection) treeViewer.getSelection();
+        selectListElements(new DependencyNodeMatcher(selection));
+        isSettingSelection = false;
       }
     });
 
-    treeViewer.addOpenListener(new IOpenListener() {
-      public void open(OpenEvent event) {
-        IStructuredSelection selection = (IStructuredSelection) treeViewer.getSelection();
-        for(Iterator<?> it = selection.iterator(); it.hasNext();) {
-          Object o = it.next();
-          if(o instanceof DependencyNode) {
-            org.eclipse.aether.artifact.Artifact a = ((DependencyNode) o).getDependency().getArtifact();
-            OpenPomAction.openEditor(a.getGroupId(), a.getArtifactId(), a.getVersion(), mavenProject, null);
-          }
+    treeViewer.addOpenListener(event -> {
+      IStructuredSelection selection = (IStructuredSelection) treeViewer.getSelection();
+      for(Iterator<?> it = selection.iterator(); it.hasNext();) {
+        Object o = it.next();
+        if(o instanceof DependencyNode) {
+          org.eclipse.aether.artifact.Artifact a = ((DependencyNode) o).getDependency().getArtifact();
+          OpenPomAction.openEditor(a.getGroupId(), a.getArtifactId(), a.getVersion(), mavenProject, null);
         }
       }
     });
@@ -325,17 +318,17 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
       FormToolkit formToolkit) {
     ToolBarManager hiearchyToolBarManager = new ToolBarManager(SWT.FLAT);
 
-    hiearchyToolBarManager.add(new Action(Messages.DependencyTreePage_action_collapseAll,
-        MavenEditorImages.COLLAPSE_ALL) {
-      public void run() {
-        treeViewer.getTree().setRedraw(false);
-        try {
-          treeViewer.collapseAll();
-        } finally {
-          treeViewer.getTree().setRedraw(true);
-        }
-      }
-    });
+    hiearchyToolBarManager
+        .add(new Action(Messages.DependencyTreePage_action_collapseAll, MavenEditorImages.COLLAPSE_ALL) {
+          public void run() {
+            treeViewer.getTree().setRedraw(false);
+            try {
+              treeViewer.collapseAll();
+            } finally {
+              treeViewer.getTree().setRedraw(true);
+            }
+          }
+        });
 
     hiearchyToolBarManager.add(new Action(Messages.DependencyTreePage_action_expandAll, MavenEditorImages.EXPAND_ALL) {
       public void run() {
@@ -443,15 +436,13 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
     listViewer.addSelectionChangedListener(listSelectionFilter);
     listViewer.getTable().addFocusListener(listSelectionFilter);
 
-    listViewer.addOpenListener(new IOpenListener() {
-      public void open(OpenEvent event) {
-        IStructuredSelection selection = (IStructuredSelection) listViewer.getSelection();
-        for(Iterator<?> it = selection.iterator(); it.hasNext();) {
-          Object o = it.next();
-          if(o instanceof Artifact) {
-            Artifact a = (Artifact) o;
-            OpenPomAction.openEditor(a.getGroupId(), a.getArtifactId(), a.getVersion(), mavenProject, null);
-          }
+    listViewer.addOpenListener(event -> {
+      IStructuredSelection selection = (IStructuredSelection) listViewer.getSelection();
+      for(Iterator<?> it = selection.iterator(); it.hasNext();) {
+        Object o = it.next();
+        if(o instanceof Artifact) {
+          Artifact a = (Artifact) o;
+          OpenPomAction.openEditor(a.getGroupId(), a.getArtifactId(), a.getVersion(), mavenProject, null);
         }
       }
     });
@@ -608,11 +599,9 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
       }
     });
 
-    searchControl.getSearchText().addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        updateJob.cancel();
-        updateJob.schedule(200);
-      }
+    searchControl.getSearchText().addModifyListener(e -> {
+      updateJob.cancel();
+      updateJob.schedule(200);
     });
   }
 
@@ -799,7 +788,7 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
       if(element instanceof DependencyNode) {
         DependencyNode node = (DependencyNode) element;
         String scope = node.getDependency().getScope();
-        if(scope != null && !"compile".equals(scope)) { //$NON-NLS-1$
+        if(scope != null && !"compile".equals(scope) && !isMatching(node)) { //$NON-NLS-1$
           return Display.getDefault().getSystemColor(SWT.COLOR_DARK_GRAY);
         }
       }
@@ -807,13 +796,25 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
     }
 
     public Color getBackground(Object element) {
-      if(matcher != null && !matcher.isEmpty() && element instanceof DependencyNode) {
-        org.eclipse.aether.artifact.Artifact a = ((DependencyNode) element).getDependency().getArtifact();
-        if(matcher.isMatchingArtifact(a.getGroupId(), a.getArtifactId())) {
-          return searchHighlightColor;
-        }
+      if(isMatching(element)) {
+        return highlighter.getBackgroundColor();
       }
       return null;
+    }
+
+    private boolean isMatching(Object element) {
+      if(element instanceof DependencyNode) {
+        return isMatching(((DependencyNode) element));
+      }
+      return false;
+    }
+
+    private boolean isMatching(DependencyNode node) {
+      if(matcher != null && !matcher.isEmpty()) {
+        org.eclipse.aether.artifact.Artifact a = node.getDependency().getArtifact();
+        return matcher.isMatchingArtifact(a.getGroupId(), a.getArtifactId());
+      }
+      return false;
     }
 
     // LabelProvider
@@ -902,7 +903,7 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
       if(element instanceof Artifact) {
         Artifact a = (Artifact) element;
         String scope = a.getScope();
-        if(scope != null && !"compile".equals(scope)) { //$NON-NLS-1$
+        if(scope != null && !"compile".equals(scope) && !isMatching(a)) {
           return Display.getDefault().getSystemColor(SWT.COLOR_DARK_GRAY);
         }
       }
@@ -910,15 +911,18 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
     }
 
     public Color getBackground(Object element) {
-      if(matcher != null && !matcher.isEmpty() && element instanceof Artifact) {
-        Artifact a = (Artifact) element;
-        if(matcher.isMatchingArtifact(a.getGroupId(), a.getArtifactId())) {
-          return searchHighlightColor;
-        }
+      if(element instanceof Artifact && isMatching((Artifact) element)) {
+        return highlighter.getBackgroundColor();
       }
       return null;
     }
 
+    private boolean isMatching(Artifact a) {
+      if(matcher != null && !matcher.isEmpty()) {
+        return matcher.isMatchingArtifact(a.getGroupId(), a.getArtifactId());
+      }
+      return false;
+    }
     // LabelProvider
 
     @Override
@@ -1036,9 +1040,8 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
   @Override
   public void dispose() {
     MavenPluginActivator.getDefault().getMavenProjectManager().removeMavenProjectChangedListener(this);
-
-    if(searchHighlightColor != null) {
-      searchHighlightColor.dispose();
+    if(highlighter != null) {
+      highlighter.dispose();
     }
     super.dispose();
   }
@@ -1124,4 +1127,46 @@ public class DependencyTreePage extends FormPage implements IMavenProjectChanged
       }
     }.schedule();
   }
+
+  /**
+   * Holds highlight color, bound to "org.eclipse.search.ui.match.highlight" preference. Updates when preference
+   * changes.
+   */
+  private static class Highlighter implements IPropertyChangeListener, IDisposable {
+
+    private static final String HIGHLIGHT_BG_COLOR_NAME = "org.eclipse.search.ui.match.highlight";
+
+    private Color backgroundColor;
+
+    public Highlighter() {
+      initialize();
+    }
+
+    public void initialize() {
+      dispose();
+      JFaceResources.getColorRegistry().addListener(this);
+      setColors();
+    }
+
+    private void setColors() {
+      backgroundColor = JFaceResources.getColorRegistry().get(HIGHLIGHT_BG_COLOR_NAME);
+    }
+
+    public void dispose() {
+      JFaceResources.getColorRegistry().removeListener(this);
+    }
+
+    public void propertyChange(PropertyChangeEvent event) {
+      String property = event.getProperty();
+      if(HIGHLIGHT_BG_COLOR_NAME.equals(property)) {
+        Display.getDefault().asyncExec(() -> setColors());
+      }
+    }
+
+    Color getBackgroundColor() {
+      return backgroundColor;
+    }
+
+  }
+
 }

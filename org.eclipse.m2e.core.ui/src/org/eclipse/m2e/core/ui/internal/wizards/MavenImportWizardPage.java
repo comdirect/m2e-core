@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2013 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -38,27 +40,22 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.jface.dialogs.IMessageProvider;
 import org.eclipse.jface.operation.IRunnableWithProgress;
-import org.eclipse.jface.viewers.CheckStateChangedEvent;
 import org.eclipse.jface.viewers.CheckboxTreeViewer;
 import org.eclipse.jface.viewers.DelegatingStyledCellLabelProvider;
-import org.eclipse.jface.viewers.ICheckStateListener;
 import org.eclipse.jface.viewers.IColorProvider;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.ITreeSelection;
 import org.eclipse.jface.viewers.LabelProvider;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.StyledString;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.FocusAdapter;
 import org.eclipse.swt.events.FocusEvent;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -67,9 +64,7 @@ import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.swt.widgets.Tree;
@@ -166,35 +161,31 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
       final Button browseButton = new Button(composite, SWT.NONE);
       browseButton.setText(Messages.wizardImportPageBrowse);
       browseButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false));
-      browseButton.addSelectionListener(new SelectionAdapter() {
-        public void widgetSelected(SelectionEvent e) {
-          DirectoryDialog dialog = new DirectoryDialog(getShell(), SWT.NONE);
-          dialog.setText(Messages.wizardImportPageSelectRootFolder);
-          String path = rootDirectoryCombo.getText();
-          if(path.length() == 0) {
-            path = ResourcesPlugin.getWorkspace().getRoot().getLocation().toPortableString();
-          }
-          dialog.setFilterPath(path);
-
-          String result = dialog.open();
-          if(result != null) {
-            rootDirectoryCombo.setText(result);
-            if(rootDirectoryChanged()) {
-              scanProjects();
-            }
-          }
+      browseButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+        DirectoryDialog dialog = new DirectoryDialog(getShell(), SWT.NONE);
+        dialog.setText(Messages.wizardImportPageSelectRootFolder);
+        String path = rootDirectoryCombo.getText();
+        if(path.length() == 0) {
+          path = ResourcesPlugin.getWorkspace().getRoot().getLocation().toPortableString();
         }
-      });
+        dialog.setFilterPath(path);
 
-      rootDirectoryCombo.addListener(SWT.Traverse, new Listener() {
-        public void handleEvent(Event e) {
-          if(e.keyCode == SWT.CR && rootDirectoryChanged()) {
-            //New location entered : don't finish the wizard
-            if(e.detail == SWT.TRAVERSE_RETURN) {
-              e.doit = false;
-            }
+        String result = dialog.open();
+        if(result != null) {
+          rootDirectoryCombo.setText(result);
+          if(rootDirectoryChanged()) {
             scanProjects();
           }
+        }
+      }));
+
+      rootDirectoryCombo.addListener(SWT.Traverse, e -> {
+        if(e.keyCode == SWT.CR && rootDirectoryChanged()) {
+          //New location entered : don't finish the wizard
+          if(e.detail == SWT.TRAVERSE_RETURN) {
+            e.doit = false;
+          }
+          scanProjects();
         }
       });
 
@@ -215,11 +206,7 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
         public void widgetSelected(SelectionEvent e) {
           if(rootDirectoryChanged()) {
             //in runnable to have the combo popup collapse before disabling controls.
-            Display.getDefault().asyncExec(new Runnable() {
-              public void run() {
-                scanProjects();
-              }
-            });
+            Display.getDefault().asyncExec(() -> scanProjects());
           }
         }
       });
@@ -231,31 +218,26 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
 
     projectTreeViewer = new CheckboxTreeViewer(composite, SWT.BORDER);
 
-    projectTreeViewer.addCheckStateListener(new ICheckStateListener() {
-      public void checkStateChanged(CheckStateChangedEvent event) {
-        updateCheckedState();
-        setPageComplete();
-      }
+    projectTreeViewer.addCheckStateListener(event -> {
+      updateCheckedState();
+      setPageComplete();
     });
 
-    projectTreeViewer.addSelectionChangedListener(new ISelectionChangedListener() {
-
-      public void selectionChanged(SelectionChangedEvent event) {
-        IStructuredSelection selection = (IStructuredSelection) event.getSelection();
-        btnSelectTree.setEnabled(!selection.isEmpty());
-        btnDeselectTree.setEnabled(!selection.isEmpty());
-        if(selection.getFirstElement() != null) {
-          String errorMsg = validateProjectInfo((MavenProjectInfo) selection.getFirstElement());
-          if(errorMsg != null) {
-            setMessage(errorMsg, IMessageProvider.WARNING);
-          } else {
-            //TODO if no error on current, shall show any existing general errors if found..
-            setMessage(loadingErrorMessage, IMessageProvider.WARNING);
-          }
+    projectTreeViewer.addSelectionChangedListener(event -> {
+      IStructuredSelection selection = (IStructuredSelection) event.getSelection();
+      btnSelectTree.setEnabled(!selection.isEmpty());
+      btnDeselectTree.setEnabled(!selection.isEmpty());
+      if(selection.getFirstElement() != null) {
+        String errorMsg = validateProjectInfo((MavenProjectInfo) selection.getFirstElement());
+        if(errorMsg != null) {
+          setMessage(errorMsg, IMessageProvider.WARNING);
         } else {
-          //TODO if on current selection, shall show any existing general errors if existing..
+          //TODO if no error on current, shall show any existing general errors if found..
           setMessage(loadingErrorMessage, IMessageProvider.WARNING);
         }
+      } else {
+        //TODO if on current selection, shall show any existing general errors if existing..
+        setMessage(loadingErrorMessage, IMessageProvider.WARNING);
       }
     });
 
@@ -317,90 +299,61 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
     projectTree.setMenu(menu);
 
     MenuItem mntmSelectTree = new MenuItem(menu, SWT.NONE);
-    mntmSelectTree.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        setProjectSubtreeChecked(true);
-      }
-    });
+    mntmSelectTree.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> setProjectSubtreeChecked(true)));
     mntmSelectTree.setText(Messages.MavenImportWizardPage_mntmSelectTree_text);
 
     MenuItem mntmDeselectTree = new MenuItem(menu, SWT.NONE);
-    mntmDeselectTree.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        setProjectSubtreeChecked(false);
-      }
-    });
+    mntmDeselectTree
+        .addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> setProjectSubtreeChecked(false)));
     mntmDeselectTree.setText(Messages.MavenImportWizardPage_mntmDeselectTree_text);
 
     final Button selectAllButton = new Button(composite, SWT.NONE);
     selectAllButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     selectAllButton.setText(Messages.wizardImportPageSelectAll);
-    selectAllButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        projectTreeViewer.expandAll();
-        setAllChecked(true);
-        // projectTreeViewer.setSubtreeChecked(projectTreeViewer.getInput(), true);
-        validate();
-      }
-    });
+    selectAllButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      projectTreeViewer.expandAll();
+      setAllChecked(true);
+      // projectTreeViewer.setSubtreeChecked(projectTreeViewer.getInput(), true);
+      validate();
+    }));
 
     final Button deselectAllButton = new Button(composite, SWT.NONE);
     deselectAllButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
     deselectAllButton.setText(Messages.wizardImportPageDeselectAll);
-    deselectAllButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        setAllChecked(false);
-        // projectTreeViewer.setSubtreeChecked(projectTreeViewer.getInput(), false);
-        setPageComplete(false);
-      }
-    });
+    deselectAllButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      setAllChecked(false);
+      // projectTreeViewer.setSubtreeChecked(projectTreeViewer.getInput(), false);
+      setPageComplete(false);
+    }));
 
     btnSelectTree = new Button(composite, SWT.NONE);
     btnSelectTree.setEnabled(false);
-    btnSelectTree.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        setProjectSubtreeChecked(true);
-      }
-    });
+    btnSelectTree.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> setProjectSubtreeChecked(true)));
     btnSelectTree.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
     btnSelectTree.setText(Messages.MavenImportWizardPage_btnSelectTree_text);
 
     btnDeselectTree = new Button(composite, SWT.NONE);
     btnDeselectTree.setEnabled(false);
-    btnDeselectTree.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        setProjectSubtreeChecked(false);
-      }
-    });
+    btnDeselectTree.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> setProjectSubtreeChecked(false)));
     btnDeselectTree.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
     btnDeselectTree.setText(Messages.MavenImportWizardPage_btnDeselectTree_text);
 
     final Button refreshButton = new Button(composite, SWT.NONE);
     refreshButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, true));
     refreshButton.setText(Messages.wizardImportPageRefresh);
-    refreshButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        scanProjects();
-      }
-    });
+    refreshButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> scanProjects()));
 
     createWorkingSet = new Button(composite, SWT.CHECK);
     createWorkingSet.setText(Messages.MavenImportWizardPage_createWorkingSet);
     createWorkingSet.setSelection(true);
     createWorkingSet.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false, 3, 1));
-    createWorkingSet.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        boolean enabled = createWorkingSet.getSelection();
-        workingSetName.setEnabled(enabled);
-        if(enabled) {
-          workingSetName.setFocus();
-        }
+    createWorkingSet.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      boolean enabled = createWorkingSet.getSelection();
+      workingSetName.setEnabled(enabled);
+      if(enabled) {
+        workingSetName.setFocus();
       }
-    });
+    }));
 
     workingSetName = new Combo(composite, SWT.BORDER);
     GridData gd_workingSet = new GridData(SWT.FILL, SWT.CENTER, true, false, 3, 1);
@@ -408,15 +361,7 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
     workingSetName.setLayoutData(gd_workingSet);
 
     createAdvancedSettings(composite, new GridData(SWT.FILL, SWT.TOP, false, false, 3, 1));
-    resolverConfigurationComponent.template.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent arg0) {
-        Display.getDefault().asyncExec(new Runnable() {
-          public void run() {
-            validate();
-          }
-        });
-      }
-    });
+    resolverConfigurationComponent.template.addModifyListener(arg0 -> Display.getDefault().asyncExec(() -> validate()));
 
     if(locations != null && !locations.isEmpty()) {
       scanProjects();
@@ -445,7 +390,7 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
     final AbstractProjectScanner<MavenProjectInfo> projectScanner = getProjectScanner();
     try {
       getWizard().getContainer().run(true, true, new IRunnableWithProgress() {
-        public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException {
+        public void run(IProgressMonitor monitor) throws InterruptedException {
           projectScanner.run(monitor);
         }
 
@@ -681,7 +626,7 @@ public class MavenImportWizardPage extends AbstractMavenWizardPage {
       }
 
       @Override
-      public void run(IProgressMonitor monitor) throws InterruptedException {
+      public void run(IProgressMonitor monitor) {
       }
     };
   }

@@ -1,15 +1,22 @@
 /*******************************************************************************
  * Copyright (c) 2008-2018 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
  *******************************************************************************/
 
 package org.eclipse.m2e.tests.common;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -18,7 +25,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,7 +34,10 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Set;
 
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.rules.TestName;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IMarker;
@@ -63,11 +72,9 @@ import org.apache.maven.wagon.Wagon;
 
 import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.embedder.IMavenConfiguration;
-import org.eclipse.m2e.core.embedder.IMavenExecutionContext;
 import org.eclipse.m2e.core.embedder.MavenModelManager;
 import org.eclipse.m2e.core.internal.IMavenConstants;
 import org.eclipse.m2e.core.internal.MavenPluginActivator;
-import org.eclipse.m2e.core.internal.embedder.AbstractRunnable;
 import org.eclipse.m2e.core.internal.embedder.MavenImpl;
 import org.eclipse.m2e.core.internal.lifecyclemapping.LifecycleMappingFactory;
 import org.eclipse.m2e.core.internal.preferences.MavenConfigurationImpl;
@@ -87,7 +94,7 @@ import org.eclipse.m2e.jdt.internal.BuildPathManager;
 
 
 @SuppressWarnings("restriction")
-public abstract class AbstractMavenProjectTestCase extends TestCase {
+public abstract class AbstractMavenProjectTestCase {
 
   public static final int DELETE_RETRY_COUNT = 10;
 
@@ -96,6 +103,9 @@ public abstract class AbstractMavenProjectTestCase extends TestCase {
   protected static final IProgressMonitor monitor = new NullProgressMonitor();
 
   protected IWorkspace workspace;
+
+  @Rule
+  public TestName name = new TestName();
 
   protected File repo;
 
@@ -107,11 +117,8 @@ public abstract class AbstractMavenProjectTestCase extends TestCase {
 
   private String oldUserSettingsFile;
 
-  protected void setUp() throws Exception {
-    System.out.println("TEST-SETUP: " + getName());
-
-    super.setUp();
-
+  @Before
+  public void setUp() throws Exception {
     workspace = ResourcesPlugin.getWorkspace();
     mavenConfiguration = MavenPlugin.getMavenConfiguration();
     setAutoBuilding(false);
@@ -151,21 +158,18 @@ public abstract class AbstractMavenProjectTestCase extends TestCase {
     FilexWagon.setRequestFilterPattern(null, true);
   }
 
-  protected void tearDown() throws Exception {
-    try {
-      waitForJobsToComplete();
-      WorkspaceHelpers.cleanWorkspace();
+  @After
+  public void tearDown() throws Exception {
+    waitForJobsToComplete();
+    WorkspaceHelpers.cleanWorkspace();
 
-      // Restore the user settings file location
-      mavenConfiguration.setUserSettingsFile(oldUserSettingsFile);
+    // Restore the user settings file location
+    mavenConfiguration.setUserSettingsFile(oldUserSettingsFile);
 
-      projectRefreshJob.wakeUp();
-      setAutoBuilding(false);
-      setAutomaticallyUpdateConfiguration(false);
-      FilexWagon.reset();
-    } finally {
-      super.tearDown();
-    }
+    projectRefreshJob.wakeUp();
+    setAutoBuilding(false);
+    setAutomaticallyUpdateConfiguration(false);
+    FilexWagon.reset();
   }
 
   /**
@@ -255,25 +259,23 @@ public abstract class AbstractMavenProjectTestCase extends TestCase {
   protected IProject createProject(String projectName, final String pomResource) throws CoreException {
     final IProject project = workspace.getRoot().getProject(projectName);
 
-    workspace.run(new IWorkspaceRunnable() {
-      public void run(IProgressMonitor monitor) throws CoreException {
-        project.create(monitor);
+    workspace.run((IWorkspaceRunnable) monitor -> {
+      project.create(monitor);
 
-        if(!project.isOpen()) {
-          project.open(monitor);
-        }
+      if(!project.isOpen()) {
+        project.open(monitor);
+      }
 
-        IFile pomFile = project.getFile("pom.xml");
-        if(!pomFile.exists()) {
-          InputStream is = null;
-          try {
-            is = new FileInputStream(pomResource);
-            pomFile.create(is, true, monitor);
-          } catch(FileNotFoundException ex) {
-            throw new CoreException(new Status(IStatus.ERROR, "", 0, ex.toString(), ex));
-          } finally {
-            IOUtil.close(is);
-          }
+      IFile pomFile = project.getFile("pom.xml");
+      if(!pomFile.exists()) {
+        InputStream is = null;
+        try {
+          is = new FileInputStream(pomResource);
+          pomFile.create(is, true, monitor);
+        } catch(FileNotFoundException ex) {
+          throw new CoreException(new Status(IStatus.ERROR, "", 0, ex.toString(), ex));
+        } finally {
+          IOUtil.close(is);
         }
       }
     }, null);
@@ -288,23 +290,24 @@ public abstract class AbstractMavenProjectTestCase extends TestCase {
   protected IProject createExisting(String projectName, String projectLocation, boolean addNature)
       throws IOException, CoreException {
     File dir = new File(workspace.getRoot().getLocation().toFile(), projectName);
+    if(dir.isFile()) {
+      dir = dir.getParentFile();
+    }
     copyDir(new File(projectLocation), dir);
 
     final IProject project = workspace.getRoot().getProject(projectName);
 
-    workspace.run(new IWorkspaceRunnable() {
-      public void run(IProgressMonitor monitor) throws CoreException {
-        if(!project.exists()) {
-          IProjectDescription projectDescription = workspace.newProjectDescription(project.getName());
-          if(addNature) {
-            projectDescription.setNatureIds(new String[] {IMavenConstants.NATURE_ID});
-          }
-          projectDescription.setLocation(null);
-          project.create(projectDescription, monitor);
-          project.open(IResource.NONE, monitor);
-        } else {
-          project.refreshLocal(IResource.DEPTH_INFINITE, monitor);
+    workspace.run((IWorkspaceRunnable) monitor -> {
+      if(!project.exists()) {
+        IProjectDescription projectDescription = workspace.newProjectDescription(project.getName());
+        if(addNature) {
+          projectDescription.setNatureIds(new String[] {IMavenConstants.NATURE_ID});
         }
+        projectDescription.setLocation(null);
+        project.create(projectDescription, monitor);
+        project.open(IResource.NONE, monitor);
+      } else {
+        project.refreshLocal(IResource.DEPTH_INFINITE, monitor);
       }
     }, null);
 
@@ -401,12 +404,10 @@ public abstract class AbstractMavenProjectTestCase extends TestCase {
 
     final ArrayList<IMavenProjectImportResult> importResults = new ArrayList<IMavenProjectImportResult>();
 
-    workspace.run(new IWorkspaceRunnable() {
-      public void run(IProgressMonitor monitor) throws CoreException {
-        importResults.addAll(MavenPlugin.getProjectConfigurationManager().importProjects(projectInfos,
-            importConfiguration, listener, monitor));
-      }
-    }, MavenPlugin.getProjectConfigurationManager().getRule(), IWorkspace.AVOID_UPDATE, monitor);
+    workspace.run(
+        (IWorkspaceRunnable) monitor -> importResults.addAll(MavenPlugin.getProjectConfigurationManager()
+            .importProjects(projectInfos, importConfiguration, listener, monitor)),
+        MavenPlugin.getProjectConfigurationManager().getRule(), IWorkspace.AVOID_UPDATE, monitor);
 
     IProject[] projects = new IProject[projectInfos.size()];
     for(int i = 0; i < projectInfos.size(); i++ ) {
@@ -457,13 +458,11 @@ public abstract class AbstractMavenProjectTestCase extends TestCase {
     final MavenProjectInfo projectInfo = new MavenProjectInfo(projectName, pomFile, model, null);
     setBasedirRename(projectInfo);
 
-    workspace.run(new IWorkspaceRunnable() {
-      public void run(IProgressMonitor monitor) throws CoreException {
-        MavenPlugin.getProjectConfigurationManager().importProjects(Collections.singleton(projectInfo),
-            importConfiguration, monitor);
-        IProject project = workspace.getRoot().getProject(importConfiguration.getProjectName(projectInfo.getModel()));
-        assertNotNull("Failed to import project " + projectInfo, project);
-      }
+    workspace.run((IWorkspaceRunnable) monitor -> {
+      MavenPlugin.getProjectConfigurationManager().importProjects(Collections.singleton(projectInfo),
+          importConfiguration, monitor);
+      IProject project = workspace.getRoot().getProject(importConfiguration.getProjectName(projectInfo.getModel()));
+      assertNotNull("Failed to import project " + projectInfo, project);
     }, MavenPlugin.getProjectConfigurationManager().getRule(), IWorkspace.AVOID_UPDATE, monitor);
 
     return workspace.getRoot().getProject(projectName);
@@ -603,62 +602,6 @@ public abstract class AbstractMavenProjectTestCase extends TestCase {
     }
     MavenPluginActivator.getDefault().getMavenProjectManagerImpl().putMavenProject((MavenProjectFacade) projectFacade,
         null);
-  }
-
-  @Override
-  public void runTest() throws Throwable {
-    if(!requiresMavenExecutionContext()) {
-      super.runTest();
-    } else {
-      @SuppressWarnings("serial")
-      class WrappedThrowable extends RuntimeException {
-        public WrappedThrowable(Throwable ex) {
-          super(ex);
-        }
-      }
-      try {
-        MavenPlugin.getMaven().execute(new AbstractRunnable() {
-          @SuppressWarnings("synthetic-access")
-          protected void run(IMavenExecutionContext context, IProgressMonitor monitor) {
-            try {
-              AbstractMavenProjectTestCase.super.runTest();
-            } catch(Throwable ex) {
-              throw new WrappedThrowable(ex);
-            }
-          }
-        }, monitor);
-      } catch(WrappedThrowable e) {
-        throw e.getCause();
-      }
-    }
-  }
-
-  private boolean requiresMavenExecutionContext() {
-    String fName = getName();
-    if(fName != null) {
-      try {
-        Method runMethod = getClass().getMethod(fName, (Class[]) null);
-        RequireMavenExecutionContext ann = runMethod.getAnnotation(RequireMavenExecutionContext.class);
-        if(ann != null) {
-          return ann.require();
-        }
-      } catch(SecurityException ex) {
-        // fall through
-      } catch(NoSuchMethodException ex) {
-        // fall through
-      }
-    }
-
-    Class<?> clazz = getClass();
-    do {
-      RequireMavenExecutionContext ann = clazz.getAnnotation(RequireMavenExecutionContext.class);
-      if(ann != null) {
-        return ann.require();
-      }
-      clazz = clazz.getSuperclass();
-    } while(clazz != null);
-
-    return false;
   }
 
 }

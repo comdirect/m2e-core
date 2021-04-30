@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2018 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -57,7 +59,6 @@ import org.apache.maven.project.MavenProject;
 
 import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.embedder.ArtifactKey;
-import org.eclipse.m2e.core.embedder.ICallable;
 import org.eclipse.m2e.core.embedder.IMaven;
 import org.eclipse.m2e.core.embedder.IMavenExecutionContext;
 import org.eclipse.m2e.core.internal.IMavenConstants;
@@ -139,13 +140,12 @@ public class SelectionUtil {
   /**
    * Checks if the object belongs to a given type and returns it or a suitable adapter.
    */
-  @SuppressWarnings("unchecked")
   public static <T> T getType(Object element, Class<T> type) {
     if(element == null) {
       return null;
     }
     if(type.isInstance(element)) {
-      return (T) element;
+      return type.cast(element);
     }
     if(element instanceof IAdaptable) {
       T adapter = ((IAdaptable) element).getAdapter(type);
@@ -218,7 +218,7 @@ public class SelectionUtil {
 //    }
   }
 
-  public static ArtifactKey getArtifactKey(Object element) throws CoreException {
+  public static ArtifactKey getArtifactKey(Object element) {
     if(element instanceof Artifact) {
       return new ArtifactKey(((Artifact) element));
 
@@ -309,11 +309,7 @@ public class SelectionUtil {
     request.setUpdateSnapshots(false);
     request.setRecursive(false);
 
-    MavenExecutionResult result = context.execute(new ICallable<MavenExecutionResult>() {
-      public MavenExecutionResult call(IMavenExecutionContext context, IProgressMonitor monitor) throws CoreException {
-        return maven.readMavenProject(pomFile, context.newProjectBuildingRequest());
-      }
-    }, monitor);
+    MavenExecutionResult result = context.execute((context1, monitor1) -> maven.readMavenProject(pomFile, context1.newProjectBuildingRequest()), monitor);
 
     MavenProject project = result.getProject();
     if(project != null) {

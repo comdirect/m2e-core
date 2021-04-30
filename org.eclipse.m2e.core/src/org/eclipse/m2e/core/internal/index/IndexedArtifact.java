@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -20,27 +22,23 @@ import org.apache.maven.artifact.versioning.ArtifactVersion;
 
 public class IndexedArtifact implements Comparable<IndexedArtifact> {
 
-  public static final Comparator<IndexedArtifactFile> FILE_INFO_COMPARATOR = new Comparator<IndexedArtifactFile>() {
-
-    public int compare(IndexedArtifactFile f1, IndexedArtifactFile f2) {
-      ArtifactVersion v1 = f1.getArtifactVersion();
-      ArtifactVersion v2 = f2.getArtifactVersion();
-      int r = -v1.compareTo(v2);
-      if(r != 0) {
-        return r;
-      }
-
-      String c1 = f1.classifier;
-      String c2 = f2.classifier;
-      if(c1 == null) {
-        return c2 == null ? 0 : -1;
-      }
-      if(c2 == null) {
-        return 1;
-      }
-      return c1.compareTo(c2);
+  public static final Comparator<IndexedArtifactFile> FILE_INFO_COMPARATOR = (f1, f2) -> {
+    ArtifactVersion v1 = f1.getArtifactVersion();
+    ArtifactVersion v2 = f2.getArtifactVersion();
+    int r = -v1.compareTo(v2);
+    if(r != 0) {
+      return r;
     }
 
+    String c1 = f1.classifier;
+    String c2 = f2.classifier;
+    if(c1 == null) {
+      return c2 == null ? 0 : -1;
+    }
+    if(c2 == null) {
+      return 1;
+    }
+    return c1.compareTo(c2);
   };
 
   private final String group;

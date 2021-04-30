@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -27,8 +29,7 @@ import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.window.Window;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -60,7 +61,8 @@ public class MavenRuntimeSelector extends Composite {
   }
 
   public MavenRuntimeSelector(final Composite mainComposite) {
-    super(mainComposite, SWT.NONE);
+    super(mainComposite, SWT.BACKGROUND);
+    mainComposite.setBackgroundMode(SWT.INHERIT_DEFAULT);
 
     GridLayout gridLayout = new GridLayout(2, false);
     gridLayout.marginWidth = 0;
@@ -128,15 +130,13 @@ public class MavenRuntimeSelector extends Composite {
     configureRuntimesButton = new Button(this, SWT.NONE);
     configureRuntimesButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false));
     configureRuntimesButton.setText(org.eclipse.m2e.internal.launch.Messages.MavenLaunchMainTab_btnConfigure);
-    configureRuntimesButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        PreferenceDialog dialog = PreferencesUtil.createPreferenceDialogOn(mainComposite.getShell(),
-            "org.eclipse.m2e.core.preferences.MavenInstallationsPreferencePage", null, null); //$NON-NLS-1$
-        if(dialog.open() == Window.OK) {
-          setInput();
-        }
+    configureRuntimesButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      PreferenceDialog dialog = PreferencesUtil.createPreferenceDialogOn(mainComposite.getShell(),
+          "org.eclipse.m2e.core.preferences.MavenInstallationsPreferencePage", null, null); //$NON-NLS-1$
+      if(dialog.open() == Window.OK) {
+        setInput();
       }
-    });
+    }));
   }
 
   protected String getType(AbstractMavenRuntime runtime) {

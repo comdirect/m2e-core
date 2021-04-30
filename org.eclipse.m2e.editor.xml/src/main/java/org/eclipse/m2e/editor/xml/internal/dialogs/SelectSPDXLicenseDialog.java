@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2012 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -18,21 +20,16 @@ import org.eclipse.core.runtime.Status;
 import org.eclipse.jface.viewers.ILabelProvider;
 import org.eclipse.jface.viewers.ILabelProviderListener;
 import org.eclipse.jface.viewers.ISelection;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredContentProvider;
 import org.eclipse.jface.viewers.IStructuredSelection;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerFilter;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Composite;
@@ -95,18 +92,15 @@ public class SelectSPDXLicenseDialog extends AbstractMavenDialog {
         handleDoubleClick();
       }
     });
-    licensesTable.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        ISelection selection = licensesViewer.getSelection();
-        if(selection instanceof IStructuredSelection && !selection.isEmpty()) {
-          license = (SPDXLicense) ((IStructuredSelection) selection).getFirstElement();
-        } else {
-          license = null;
-        }
-        updateStatus();
+    licensesTable.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      ISelection selection = licensesViewer.getSelection();
+      if(selection instanceof IStructuredSelection && !selection.isEmpty()) {
+        license = (SPDXLicense) ((IStructuredSelection) selection).getFirstElement();
+      } else {
+        license = null;
       }
-    });
+      updateStatus();
+    }));
     GridData gd_licensesTable = new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1);
     gd_licensesTable.heightHint = 400;
     licensesTable.setLayoutData(gd_licensesTable);
@@ -151,17 +145,15 @@ public class SelectSPDXLicenseDialog extends AbstractMavenDialog {
     });
     licensesViewer.setInput(SPDXLicense.getStandardLicenses());
 
-    licenseFilter.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        String text = licenseFilter.getText();
-        ViewerFilter[] filters;
-        if(text != null && text.trim().length() > 0) {
-          filters = new ViewerFilter[] {new LicenseFilter(text.trim())};
-        } else {
-          filters = new ViewerFilter[] {};
-        }
-        licensesViewer.setFilters(filters);
+    licenseFilter.addModifyListener(e -> {
+      String text = licenseFilter.getText();
+      ViewerFilter[] filters;
+      if(text != null && text.trim().length() > 0) {
+        filters = new ViewerFilter[] {new LicenseFilter(text.trim())};
+      } else {
+        filters = new ViewerFilter[] {};
       }
+      licensesViewer.setFilters(filters);
     });
 
     Label lblPomxml = new Label(container, SWT.NONE);
@@ -174,15 +166,12 @@ public class SelectSPDXLicenseDialog extends AbstractMavenDialog {
         handleDoubleClick();
       }
     });
-    parentComposite.addSelectionChangedListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent event) {
-        ISelection selection = parentComposite.getSelection();
-        if(selection instanceof IStructuredSelection && !selection.isEmpty()) {
-          ParentHierarchyEntry mavenProject = (ParentHierarchyEntry) ((IStructuredSelection) selection)
-              .getFirstElement();
-          targetProject = mavenProject.getFacade();
-          updateStatus();
-        }
+    parentComposite.addSelectionChangedListener(event -> {
+      ISelection selection = parentComposite.getSelection();
+      if(selection instanceof IStructuredSelection && !selection.isEmpty()) {
+        ParentHierarchyEntry mavenProject = (ParentHierarchyEntry) ((IStructuredSelection) selection).getFirstElement();
+        targetProject = mavenProject.getFacade();
+        updateStatus();
       }
     });
     parentComposite.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));

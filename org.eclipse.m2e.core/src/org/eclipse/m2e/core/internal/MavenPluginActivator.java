@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2010, 2018 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -12,12 +14,17 @@
 package org.eclipse.m2e.core.internal;
 
 import java.io.File;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Hashtable;
 
 import org.osgi.framework.BundleContext;
-import org.osgi.framework.BundleEvent;
 import org.osgi.framework.BundleListener;
 import org.osgi.framework.Constants;
+import org.osgi.framework.ServiceRegistration;
 import org.osgi.framework.Version;
+import org.osgi.service.url.URLConstants;
+import org.osgi.service.url.URLStreamHandlerService;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,12 +57,9 @@ import org.apache.maven.artifact.factory.ArtifactFactory;
 import org.apache.maven.artifact.metadata.ArtifactMetadataSource;
 import org.apache.maven.artifact.resolver.ArtifactCollector;
 import org.apache.maven.execution.MavenSession;
-import org.apache.maven.index.ArtifactContextProducer;
-import org.apache.maven.index.NexusIndexer;
 import org.apache.maven.index.updater.IndexUpdater;
 import org.apache.maven.plugin.LegacySupport;
 import org.apache.maven.project.DefaultProjectBuilder;
-import org.apache.maven.project.MavenProject;
 import org.apache.maven.repository.legacy.WagonManager;
 
 import org.eclipse.m2e.core.MavenPlugin;
@@ -97,14 +101,7 @@ public class MavenPluginActivator extends Plugin {
   // The shared instance
   private static MavenPluginActivator plugin;
 
-  /**
-   * @deprecated see {@link #getPlexusContainer()} for more info
-   */
-  private DefaultPlexusContainer plexus;
-
-  private DefaultPlexusContainer indexerContainer;
-
-  private DefaultPlexusContainer archetyperContainer;
+  private Collection<PlexusContainer> toDisposeContainers = new HashSet<>();
 
   private MavenModelManager modelManager;
 
@@ -136,17 +133,12 @@ public class MavenPluginActivator extends Plugin {
 
   private IMavenConfiguration mavenConfiguration;
 
-  private BundleListener bundleListener = new BundleListener() {
-
-    public void bundleChanged(BundleEvent event) {
-      LifecycleMappingFactory.setBundleMetadataSources(null);
-    }
-  };
+  private BundleListener bundleListener = event -> LifecycleMappingFactory.setBundleMetadataSources(null);
 
   private ISaveParticipant saveParticipant = new ISaveParticipant() {
 
     @Override
-    public void saving(ISaveContext context) throws CoreException {
+    public void saving(ISaveContext context) {
       if(managerImpl != null) {
         managerImpl.writeWorkspaceState();
       }
@@ -157,7 +149,7 @@ public class MavenPluginActivator extends Plugin {
     }
 
     @Override
-    public void prepareToSave(ISaveContext context) throws CoreException {
+    public void prepareToSave(ISaveContext context) {
     }
 
     @Override
@@ -170,6 +162,8 @@ public class MavenPluginActivator extends Plugin {
   private IProjectConversionManager projectConversionManager;
 
   private IWorkspaceClassifierResolverManager workspaceClassifierResolverManager;
+
+  private ServiceRegistration<URLStreamHandlerService> protocolHandlerService;
 
   public MavenPluginActivator() {
     plugin = this;
@@ -187,6 +181,7 @@ public class MavenPluginActivator extends Plugin {
   /**
    * This method is called upon plug-in activation
    */
+  @Override
   public void start(final BundleContext context) throws Exception {
     super.start(context);
 
@@ -210,25 +205,8 @@ public class MavenPluginActivator extends Plugin {
     }
 
     this.mavenConfiguration = new MavenConfigurationImpl();
-
-    // this is suboptimal. ideally, we want single "root" container that exposes maven core components
-    // and two "child" containers that expose indexer and archetyper. root container should also
-    // be used by MavenImpl. this is not currently possible due to sisu limitations, so we create
-    // four separate containers for now and hopefully clean this up further later.
-    this.plexus = newPlexusContainer(MavenProject.class.getClassLoader());
-    this.indexerContainer = newPlexusContainer(IndexUpdater.class.getClassLoader());
-    this.archetyperContainer = newPlexusContainer(ArchetypeGenerationRequest.class.getClassLoader());
-
     File stateLocationDir = getStateLocation().toFile();
 
-    // TODO this is broken, need to make it lazy, otherwise we'll deadlock or timeout... or both 
-    this.archetypeManager = newArchetypeManager(archetyperContainer, stateLocationDir);
-    try {
-      this.archetypeManager.readCatalogs();
-    } catch(Exception ex) {
-      String msg = "Can't read archetype catalog configuration";
-      log.error(msg, ex);
-    }
 
     this.mavenMarkerManager = new MavenMarkerManager(mavenConfiguration);
 
@@ -269,14 +247,6 @@ public class MavenPluginActivator extends Plugin {
     this.maven.addSettingsChangeListener(repositoryRegistry);
     this.projectManager.addMavenProjectChangedListener(repositoryRegistry);
 
-    //create the index manager
-    this.indexManager = new NexusIndexManager(indexerContainer, projectManager, repositoryRegistry, stateLocationDir);
-    this.projectManager.addMavenProjectChangedListener(indexManager);
-    this.maven.addLocalRepositoryListener(new IndexingTransferListener(indexManager));
-    this.repositoryRegistry.addRepositoryIndexer(indexManager);
-    this.repositoryRegistry.addRepositoryDiscoverer(new IndexesExtensionReader(indexManager));
-    context.addBundleListener(bundleListener);
-
     //
     this.artifactFilterManager = new ArtifactFilterManager();
 
@@ -287,6 +257,11 @@ public class MavenPluginActivator extends Plugin {
 
     this.workspaceClassifierResolverManager = new WorkspaceClassifierResolverManager();
     ResourcesPlugin.getWorkspace().addSaveParticipant(IMavenConstants.PLUGIN_ID, saveParticipant);
+    //register URL handler, we can't use DS here because this triggers loading of m2e too early
+    Hashtable<String, Object>               properties = new Hashtable<>();
+    properties.put(URLConstants.URL_HANDLER_PROTOCOL, new String[] {"mvn"});
+    this.protocolHandlerService = context.registerService(URLStreamHandlerService.class,
+        new MvnProtocolHandlerService(), properties);
   }
 
   private DefaultPlexusContainer newPlexusContainer(ClassLoader cl) throws PlexusContainerException {
@@ -303,7 +278,7 @@ public class MavenPluginActivator extends Plugin {
     return new DefaultPlexusContainer(cc, logginModule);
   }
 
-  private static ArchetypeManager newArchetypeManager(DefaultPlexusContainer container, File stateLocationDir) {
+  private static ArchetypeManager newArchetypeManager(PlexusContainer container, File stateLocationDir) {
     ArchetypeManager archetypeManager = new ArchetypeManager(container, new File(stateLocationDir, PREFS_ARCHETYPES));
     archetypeManager.addArchetypeCatalogFactory(new ArchetypeCatalogFactory.NexusIndexerCatalogFactory());
     archetypeManager.addArchetypeCatalogFactory(new ArchetypeCatalogFactory.InternalCatalogFactory());
@@ -317,17 +292,27 @@ public class MavenPluginActivator extends Plugin {
   /**
    * @deprecated provided for backwards compatibility only. all component lookup must go though relevant subsystem --
    *             {@link MavenImpl}, {@link NexusIndexManager} or {@link ArchetypeManager}.
+   *             <p>In most case, use <code>MavenPlugin.getMaven().lookup(...)</code> instead.
    */
+  @Deprecated
   public PlexusContainer getPlexusContainer() {
-    return plexus;
+    try {
+      return getMaven().getPlexusContainer();
+    } catch(CoreException ex) {
+      getLog().log(ex.getStatus());
+      return null;
+    }
   }
 
   /**
    * This method is called when the plug-in is stopped
    */
+  @Override
   public void stop(BundleContext context) throws Exception {
     super.stop(context);
-
+    if(protocolHandlerService != null) {
+      protocolHandlerService.unregister();
+    }
     context.removeBundleListener(bundleListener);
 
     this.mavenBackgroundJob.cancel();
@@ -342,13 +327,13 @@ public class MavenPluginActivator extends Plugin {
     this.mavenBackgroundJob = null;
 
     this.projectManager.removeMavenProjectChangedListener(this.configurationManager);
-    this.projectManager.removeMavenProjectChangedListener(indexManager);
+    if(indexManager != null) {
+      this.projectManager.removeMavenProjectChangedListener(indexManager);
+    }
     this.projectManager.removeMavenProjectChangedListener(repositoryRegistry);
     this.projectManager = null;
 
-    this.archetyperContainer.dispose();
-    this.indexerContainer.dispose();
-    this.plexus.dispose();
+    toDisposeContainers.forEach(PlexusContainer::dispose);
     this.maven.disposeContainer();
 
     workspace.removeResourceChangeListener(configurationManager);
@@ -380,6 +365,23 @@ public class MavenPluginActivator extends Plugin {
   }
 
   public NexusIndexManager getIndexManager() {
+    synchronized(this) {
+      if(this.indexManager == null) {
+        try {
+          PlexusContainer indexerContainer = newPlexusContainer(IndexUpdater.class.getClassLoader());
+          toDisposeContainers.add(indexerContainer);
+          this.indexManager = new NexusIndexManager(indexerContainer, getMavenProjectManager(), getRepositoryRegistry(),
+              getStateLocation().toFile());
+          getMavenProjectManager().addMavenProjectChangedListener(indexManager);
+          getMaven().addLocalRepositoryListener(new IndexingTransferListener(indexManager));
+          ((RepositoryRegistry) getRepositoryRegistry()).addRepositoryIndexer(indexManager);
+          ((RepositoryRegistry) getRepositoryRegistry())
+              .addRepositoryDiscoverer(new IndexesExtensionReader(indexManager));
+        } catch(PlexusContainerException ex1) {
+          log.error("Failed to initialize the NexusIndexManager", ex1);
+        }
+      }
+    }
     return this.indexManager;
   }
 
@@ -388,6 +390,23 @@ public class MavenPluginActivator extends Plugin {
   }
 
   public ArchetypeManager getArchetypeManager() {
+    synchronized(this) {
+      if(this.archetypeManager == null) {
+        try {
+          PlexusContainer archetyperContainer = newPlexusContainer(ArchetypeGenerationRequest.class.getClassLoader());
+          // TODO this is broken, need to make it lazy, otherwise we'll deadlock or timeout... or both 
+          this.archetypeManager = newArchetypeManager(archetyperContainer, getStateLocation().toFile());
+          try {
+            this.archetypeManager.readCatalogs();
+          } catch(Exception ex) {
+            String msg = "Can't read archetype catalog configuration";
+            log.error(msg, ex);
+          }
+        } catch(PlexusContainerException ex1) {
+          log.error("Failed to initialize the ArchetypeManager", ex1);
+        }
+      }
+    }
     return this.archetypeManager;
   }
 
@@ -437,40 +456,18 @@ public class MavenPluginActivator extends Plugin {
    * @deprecated use {@link ArchetypeManager#getArchetypeDataSource(String)}
    */
   public ArchetypeDataSource getArchetypeDataSource(String hint) {
-    return archetypeManager.getArchetypeDataSource(hint);
+    return getArchetypeManager().getArchetypeDataSource(hint);
   }
 
   /**
    * @deprecated use {@link ArchetypeManager#getArchetypeArtifactManager()}
    */
   public ArchetypeArtifactManager getArchetypeArtifactManager() {
-    return archetypeManager.getArchetypeArtifactManager();
-  }
-
-  /**
-   * @deprecated use {@link NexusIndexManager#getIndexUpdate()}
-   */
-  public IndexUpdater getIndexUpdater() {
-    return indexManager.getIndexUpdate();
+    return getArchetypeManager().getArchetypeArtifactManager();
   }
 
   public WagonManager getWagonManager() {
     return maven.lookupComponent(WagonManager.class);
-  }
-
-  /**
-   * @deprecated use {@link NexusIndexManager#getIndexer()}
-   */
-  public NexusIndexer getNexusIndexer() {
-    return indexManager.getIndexer();
-  }
-
-  /**
-   * @deprecated use {@link NexusIndexManager#getArtifactContextProducer()}
-   * @return
-   */
-  public ArtifactContextProducer getArtifactContextProducer() {
-    return indexManager.getArtifactContextProducer();
   }
 
   public ArtifactFactory getArtifactFactory() {

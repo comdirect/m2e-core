@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -17,8 +19,7 @@ import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
@@ -84,8 +85,7 @@ public class MavenLocationComponent extends Composite {
     inWorkspaceButton = new Button(locationGroup, SWT.RADIO);
     inWorkspaceButton.setText(Messages.locationComponentInWorkspace);
     inWorkspaceButton.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false, 3, 1));
-    inWorkspaceButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
+    inWorkspaceButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
         boolean isEnabled = !inWorkspaceButton.getSelection();
         locationLabel.setEnabled(isEnabled);
         locationCombo.setEnabled(isEnabled);
@@ -94,7 +94,7 @@ public class MavenLocationComponent extends Composite {
           modifyingListener.modifyText(null);
         }
       }
-    });
+      ));
 
     // second radio button
     inExternalLocationButton = new Button(locationGroup, SWT.RADIO);
@@ -117,23 +117,21 @@ public class MavenLocationComponent extends Composite {
     gridData = new GridData(SWT.FILL, SWT.DEFAULT, false, false);
     locationBrowseButton.setLayoutData(gridData);
 
-    locationBrowseButton.addSelectionListener(new SelectionAdapter() {
-      public void widgetSelected(SelectionEvent e) {
-        DirectoryDialog dialog = new DirectoryDialog(getShell());
-        dialog.setText(Messages.locationComponentSelectLocation);
+    locationBrowseButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+      DirectoryDialog dialog = new DirectoryDialog(getShell());
+      dialog.setText(Messages.locationComponentSelectLocation);
 
-        String path = locationCombo.getText();
-        if(path.length() == 0) {
-          path = ResourcesPlugin.getWorkspace().getRoot().getLocation().toPortableString();
-        }
-        dialog.setFilterPath(path);
-
-        String selectedDir = dialog.open();
-        if(selectedDir != null) {
-          locationCombo.setText(selectedDir.trim());
-        }
+      String path = locationCombo.getText();
+      if(path.length() == 0) {
+        path = ResourcesPlugin.getWorkspace().getRoot().getLocation().toPortableString();
       }
-    });
+      dialog.setFilterPath(path);
+
+      String selectedDir = dialog.open();
+      if(selectedDir != null) {
+        locationCombo.setText(selectedDir.trim());
+      }
+    }));
 
     inWorkspaceButton.setSelection(true);
 

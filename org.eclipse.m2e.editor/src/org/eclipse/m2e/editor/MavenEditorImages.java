@@ -1,9 +1,11 @@
 /*******************************************************************************
- * Copyright (c) 2008-2010 Sonatype, Inc.
+ * Copyright (c) 2008, 2019 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -11,13 +13,16 @@
 
 package org.eclipse.m2e.editor;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.ImageRegistry;
+import org.eclipse.jface.resource.ResourceLocator;
 import org.eclipse.swt.graphics.Image;
-import org.eclipse.ui.plugin.AbstractUIPlugin;
 
 
 /**
@@ -25,48 +30,6 @@ import org.eclipse.ui.plugin.AbstractUIPlugin;
  */
 public class MavenEditorImages {
   private static final Logger log = LoggerFactory.getLogger(MavenEditorImages.class);
-
-  // images
-
-  public static final Image IMG_CLEAR = createImage("clear.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_CLEAR_DISABLED = createImage("clear_disabled.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_PROJECT = createImage("project_obj.gif"); //$NON-NLS-1$
-
-  // object images
-
-  public static final Image IMG_JAR = createImage("jar_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_INHERITED = createImage("inherited_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_REPOSITORY = createImage("repository_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_PLUGIN = createImage("plugin_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_EXECUTION = createImage("execution_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_GOAL = createImage("goal_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_FILTER = createImage("filter_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_RESOURCE = createImage("resource_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_INCLUDE = createImage("include_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_EXCLUDE = createImage("exclude_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_PERSON = createImage("person_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_ROLE = createImage("role_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_PROPERTY = createImage("property_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_REPORT = createImage("report_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_PROFILE = createImage("profile_obj.gif"); //$NON-NLS-1$
-
-  public static final Image IMG_SCOPE = createImage("scope_obj.gif"); //$NON-NLS-1$
 
   // image descriptors
 
@@ -108,6 +71,58 @@ public class MavenEditorImages {
 
   public static final ImageDescriptor ELEMENT_OBJECT = create("element_obj.gif"); //$NON-NLS-1$
 
+  public static final ImageDescriptor IMGD_WARNINGS = create("warnings.png"); //$NON-NLS-1$
+
+  public static final ImageDescriptor IMGD_EXECUTION = create("execution_obj.gif"); //$NON-NLS-1$
+
+  public static final ImageDescriptor IMGD_DISCOVERY = create("insp_sbook.gif"); //$NON-NLS-1$
+
+  // images
+
+  public static final Image IMG_CLEAR = createImage("clear.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_CLEAR_DISABLED = createImage("clear_disabled.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_PROJECT = createImage("project_obj.gif"); //$NON-NLS-1$
+
+  // object images
+
+  public static final Image IMG_JAR = createImage("jar_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_INHERITED = createImage("inherited_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_REPOSITORY = createImage("repository_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_PLUGIN = createImage("plugin_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_EXECUTION = getImageRegistry().get("execution_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_GOAL = createImage("goal_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_FILTER = createImage("filter_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_RESOURCE = createImage("resource_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_INCLUDE = createImage("include_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_EXCLUDE = createImage("exclude_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_PERSON = createImage("person_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_ROLE = createImage("role_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_PROPERTY = createImage("property_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_REPORT = createImage("report_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_PROFILE = createImage("profile_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_SCOPE = createImage("scope_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_PARAMETER = createImage("parameter_obj.gif"); //$NON-NLS-1$
+
+  public static final Image IMG_DISCOVERY = getImageRegistry().get("insp_sbook.gif"); //$NON-NLS-1$
+
   private static ImageDescriptor create(String key) {
     try {
       ImageDescriptor imageDescriptor = createDescriptor(key);
@@ -122,6 +137,34 @@ public class MavenEditorImages {
     }
   }
 
+  public static Image getImage(ImageDescriptor imageDescriptor) {
+    Image image = Custom.images.get(imageDescriptor);
+    if(image == null) {
+      synchronized(Custom.images) {
+        image = Custom.images.get(imageDescriptor);
+        if(image == null) {
+          image = imageDescriptor.createImage();
+          if(image != null) {
+            Custom.images.put(imageDescriptor, image);
+          }
+        }
+      }
+    }
+    return image;
+  }
+
+  static class Custom {
+    static final Map<ImageDescriptor, Image> images = new ConcurrentHashMap<>();
+
+    static void dispose() {
+      for(Image img : images.values()) {
+        img.dispose();
+      }
+      images.clear();
+    }
+
+  }
+
   private static Image createImage(String key) {
     create(key);
     ImageRegistry imageRegistry = getImageRegistry();
@@ -134,7 +177,7 @@ public class MavenEditorImages {
   }
 
   private static ImageDescriptor createDescriptor(String image) {
-    return AbstractUIPlugin.imageDescriptorFromPlugin(MavenEditorPlugin.PLUGIN_ID, "icons/" + image); //$NON-NLS-1$
+    return ResourceLocator.imageDescriptorFromBundle(MavenEditorPlugin.PLUGIN_ID, "icons/" + image).get(); //$NON-NLS-1$
   }
 
 }

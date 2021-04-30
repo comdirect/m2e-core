@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2010 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -18,6 +20,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,9 +35,10 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
 
-import org.apache.maven.index.updater.AbstractResourceFetcher;
+import org.apache.maven.index.updater.ResourceFetcher;
 import org.apache.maven.wagon.authentication.AuthenticationInfo;
 import org.apache.maven.wagon.proxy.ProxyInfo;
+import org.apache.maven.wagon.proxy.ProxyUtils;
 
 import org.eclipse.m2e.core.internal.MavenPluginActivator;
 import org.eclipse.m2e.core.internal.Messages;
@@ -46,7 +51,7 @@ import io.takari.aether.client.Response;
 import io.takari.aether.okhttp.OkHttpAetherClient;
 
 
-public class AetherClientResourceFetcher extends AbstractResourceFetcher {
+public class AetherClientResourceFetcher implements ResourceFetcher {
 
   private AetherClient aetherClient;
 
@@ -68,10 +73,11 @@ public class AetherClientResourceFetcher extends AbstractResourceFetcher {
     this.userAgent = MavenPluginActivator.getUserAgent();
   }
 
-  public void connect(String id, String url) throws IOException {
-    aetherClient = new OkHttpAetherClient(new AetherClientConfigAdapter(authInfo, proxyInfo, userAgent,
-        new HashMap<String, String>()));
+  public void connect(String id, String url) {
     this.baseUrl = url;
+    aetherClient = new OkHttpAetherClient(
+        new AetherClientConfigAdapter(baseUrl, authInfo, proxyInfo, userAgent,
+        new HashMap<String, String>()));
   }
 
   public void disconnect() throws IOException {
@@ -95,6 +101,13 @@ public class AetherClientResourceFetcher extends AbstractResourceFetcher {
     }
   }
 
+  public InputStream retrieve(String name) throws IOException, FileNotFoundException {
+    String url = baseUrl + "/" + name;
+    Response response = aetherClient.get(url);
+
+    return response.getInputStream();
+  }
+
   class AetherClientConfigAdapter extends AetherClientConfig {
     private final Logger log = LoggerFactory.getLogger(AetherClientConfigAdapter.class);
 
@@ -108,10 +121,13 @@ public class AetherClientResourceFetcher extends AbstractResourceFetcher {
 
     String userAgent;
 
+    String baseUrl;
+
     Map<String, String> headers;
 
-    public AetherClientConfigAdapter(AuthenticationInfo authInfo, ProxyInfo proxyInfo, String userAgent,
+    public AetherClientConfigAdapter(String baseUrl, AuthenticationInfo authInfo, ProxyInfo proxyInfo, String userAgent,
         Map<String, String> headers) {
+      this.baseUrl = baseUrl;
       this.authInfo = authInfo;
       this.proxyInfo = proxyInfo;
       this.userAgent = userAgent;
@@ -141,6 +157,13 @@ public class AetherClientResourceFetcher extends AbstractResourceFetcher {
 
       if(proxyInfo == null) {
         return null;
+      }
+      //Bug 512006 don't return the proxy for nonProxyHosts 
+      try {
+        if(ProxyUtils.validateNonProxyHosts(proxyInfo, new URL(baseUrl).getHost())) {
+          return null;
+        }
+      } catch(MalformedURLException ignore) {
       }
 
       return new AetherClientProxy() {

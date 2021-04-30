@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2008-2017 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Sonatype, Inc. - initial API and implementation
@@ -87,16 +89,11 @@ public class DefaultClasspathManagerDelegate implements IClasspathManagerDelegat
       IProgressMonitor monitor) throws CoreException {
     ArtifactFilter scopeFilter;
 
-    if(BuildPathManager.CLASSPATH_RUNTIME == kind) {
+    if(IClasspathManager.CLASSPATH_RUNTIME == kind) {
       // ECLIPSE-33: runtime+provided scope
       // ECLIPSE-85: adding system scope
-      scopeFilter = new ArtifactFilter() {
-        public boolean include(Artifact artifact) {
-          return BuildPathManager.SCOPE_FILTER_RUNTIME.include(artifact)
-              || Artifact.SCOPE_PROVIDED.equals(artifact.getScope())
-              || Artifact.SCOPE_SYSTEM.equals(artifact.getScope());
-        }
-      };
+      scopeFilter = artifact -> BuildPathManager.SCOPE_FILTER_RUNTIME.include(artifact)
+          || Artifact.SCOPE_PROVIDED.equals(artifact.getScope()) || Artifact.SCOPE_SYSTEM.equals(artifact.getScope());
     } else {
       // ECLIPSE-33: test scope (already includes provided)
       scopeFilter = BuildPathManager.SCOPE_FILTER_TEST;

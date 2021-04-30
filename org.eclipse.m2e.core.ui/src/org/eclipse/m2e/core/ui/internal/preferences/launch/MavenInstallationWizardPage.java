@@ -1,9 +1,11 @@
 /*******************************************************************************
  * Copyright (c) 2014 Takari, Inc.
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
  *      Takari, Inc. - initial API and implementation
@@ -15,26 +17,20 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.jface.viewers.ILabelProvider;
 import org.eclipse.jface.viewers.ILabelProviderListener;
-import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITreeContentProvider;
-import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.window.Window;
 import org.eclipse.jface.wizard.WizardPage;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -166,12 +162,7 @@ public class MavenInstallationWizardPage extends WizardPage {
     composite.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 2, 1));
 
     btnExternal = new Button(composite, SWT.RADIO);
-    btnExternal.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        changeRuntimeTypeAction();
-      }
-    });
+    btnExternal.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> changeRuntimeTypeAction()));
     btnExternal.setText(Messages.MavenInstallationWizardPage_btnExternal_text_1);
 
     btnWorkspace = new Button(composite, SWT.RADIO);
@@ -181,20 +172,11 @@ public class MavenInstallationWizardPage extends WizardPage {
     lblInstallationLocation.setText(Messages.ExternalInstallPage_lblInstallationLocation_text);
 
     location = new Text(container, SWT.BORDER);
-    location.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        updateStatus();
-      }
-    });
+    location.addModifyListener(e -> updateStatus());
     location.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
 
     btnDirectory = new Button(container, SWT.NONE);
-    btnDirectory.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        selectLocationAction();
-      }
-    });
+    btnDirectory.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> selectLocationAction()));
     btnDirectory.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
     btnDirectory.setText(Messages.ExternalInstallPage_btnDirectory_text);
 
@@ -202,11 +184,7 @@ public class MavenInstallationWizardPage extends WizardPage {
     lblInstallationName.setText(Messages.ExternalInstallPage_lblInstallationName_text);
 
     name = new Text(container, SWT.BORDER);
-    name.addModifyListener(new ModifyListener() {
-      public void modifyText(ModifyEvent e) {
-        updateStatus();
-      }
-    });
+    name.addModifyListener(e -> updateStatus());
     name.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
 
     Label lblInstallationLibraries = new Label(container, SWT.NONE);
@@ -214,11 +192,7 @@ public class MavenInstallationWizardPage extends WizardPage {
     lblInstallationLibraries.setText(Messages.ExternalInstallPage_lblInstallationLibraries_text);
 
     treeViewerLibrariries = new TreeViewer(container, SWT.BORDER);
-    treeViewerLibrariries.addSelectionChangedListener(new ISelectionChangedListener() {
-      public void selectionChanged(SelectionChangedEvent event) {
-        updateButtonsState();
-      }
-    });
+    treeViewerLibrariries.addSelectionChangedListener(event -> updateButtonsState());
     treeViewerLibrariries.setContentProvider(new TreeContentProvider());
     treeViewerLibrariries.setLabelProvider(new TreeLabelProvider());
     treeViewerLibrariries.setInput(extensions);
@@ -226,52 +200,27 @@ public class MavenInstallationWizardPage extends WizardPage {
     treeLibraries.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 2, 5));
 
     btnAddProject = new Button(container, SWT.NONE);
-    btnAddProject.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        addProjectExtensionAction();
-      }
-    });
+    btnAddProject.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> addProjectExtensionAction()));
     btnAddProject.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
     btnAddProject.setText(Messages.ExternalInstallPage_btnAddProject_text);
 
     btnRemove = new Button(container, SWT.NONE);
-    btnRemove.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        removeExtensionAction();
-      }
-    });
+    btnRemove.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> removeExtensionAction()));
     btnRemove.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
     btnRemove.setText(Messages.ExternalInstallPage_btnRemove_text);
 
     btnUp = new Button(container, SWT.NONE);
-    btnUp.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        moveExtensionAction(-1);
-      }
-    });
+    btnUp.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> moveExtensionAction(-1)));
     btnUp.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
     btnUp.setText(Messages.ExternalInstallPage_btnUp_text);
 
     btnDown = new Button(container, SWT.NONE);
-    btnDown.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        moveExtensionAction(1);
-      }
-    });
+    btnDown.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> moveExtensionAction(1)));
     btnDown.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
     btnDown.setText(Messages.ExternalInstallPage_btnDown_text);
 
     Button btnRestoreDefault = new Button(container, SWT.NONE);
-    btnRestoreDefault.addSelectionListener(new SelectionAdapter() {
-      @Override
-      public void widgetSelected(SelectionEvent e) {
-        resetExtensionsAction();
-      }
-    });
+    btnRestoreDefault.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> resetExtensionsAction()));
     btnRestoreDefault.setLayoutData(new GridData(SWT.FILL, SWT.BOTTOM, false, false, 1, 1));
     btnRestoreDefault.setText(Messages.ExternalInstallPage_btnRestoreDefault_text);
 
@@ -342,11 +291,7 @@ public class MavenInstallationWizardPage extends WizardPage {
         projects.add(project);
       }
     }
-    Collections.sort(projects, new Comparator<IProject>() {
-      public int compare(IProject p1, IProject p2) {
-        return p1.getName().compareTo(p2.getName());
-      }
-    });
+    Collections.sort(projects, (p1, p2) -> p1.getName().compareTo(p2.getName()));
     ElementListSelectionDialog dialog = new ElementListSelectionDialog(getShell(), new MavenProjectLabelProvider());
     dialog.setElements(projects.toArray());
     dialog.setMessage(Messages.MavenInstallationWizardPage_selectProjectMessage);
