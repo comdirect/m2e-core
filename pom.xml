@@ -40,7 +40,7 @@
     <tycho-version>2.0.0</tycho-version>
 
     <!-- eclipse version m2e is built against -->
-    <eclipse.stream>2020-09</eclipse.stream>
+    <eclipse.stream>2020-12</eclipse.stream>
     <eclipse-repo.url>https://download.eclipse.org/eclipse/updates/4.17/</eclipse-repo.url>
     <eclipse-simrel.url>https://download.eclipse.org/releases/${eclipse.stream}</eclipse-simrel.url>
 
@@ -238,7 +238,7 @@
           </includes>
         </configuration>
       </plugin>
-      <plugin>
+<!--       <plugin>
       	<groupId>org.eclipse.tycho.extras</groupId>
       	<artifactId>tycho-p2-extras-plugin</artifactId>
       	<version>${tycho-version}</version>
@@ -255,7 +255,7 @@
       			</configuration>
       		</execution>
       	</executions>
-      </plugin>
+      </plugin> -->
     </plugins>
 
     <pluginManagement>
