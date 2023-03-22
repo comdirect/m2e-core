@@ -15,7 +15,6 @@ import java.io.*;
 import java.util.*;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.model.Model;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.*;
@@ -220,7 +219,8 @@ public class ProjectImportView extends ViewPart {
 	}
 
 	private void reloadProjectSelectionList() {
-		if (!StringUtils.isEmpty(rootDirectory)) {
+		final CharSequence cs = rootDirectory;
+		if (cs != null && cs.length() != 0) {
 			loadProjectSelectionList(rootDirectory);
 		} else {
 			projectTreeViewer.setInput(null);
@@ -236,13 +236,13 @@ public class ProjectImportView extends ViewPart {
 	 * @return Has a non-empty project list been loaded?
 	 */
 	private boolean loadProjectSelectionList(String location) {
-		if (StringUtils.isEmpty(location)) {
+		final CharSequence cs = location;
+		if (cs == null || cs.length() == 0) {
 			return false;
 		}
 
-		String workspaceRoot = ResourcesPlugin.getWorkspace().getRoot().getLocation().toOSString();
-		MavenModelManager modelManager = MavenPlugin.getMavenModelManager();
-		LocalProjectScanner scanner = new LocalProjectScanner(Collections.singletonList(workspaceRoot), false, modelManager);
+                MavenModelManager modelManager = MavenPlugin.getMavenModelManager();
+		LocalProjectScanner scanner = new LocalProjectScanner(Collections.singletonList(location), false, modelManager);
 
 		// TODO: show progress to user (no null progress monitor, instead go async)
 		try {
