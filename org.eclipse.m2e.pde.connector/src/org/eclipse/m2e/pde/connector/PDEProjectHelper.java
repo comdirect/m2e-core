@@ -1,12 +1,14 @@
 /*******************************************************************************
- * Copyright (c) 2011, 2022 Sonatype, Inc.
+ * Copyright (c) 2011, 2022 Sonatype, Inc. and others
  *
- * This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License 2.0
- * which accompanies this distribution, and is available at
- * https://www.eclipse.org/legal/epl-2.0/
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0.
  *
  * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *   Sonatype, Inc. - initial API and implementation
  *******************************************************************************/
 package org.eclipse.m2e.pde.connector;
 
@@ -36,12 +38,14 @@ import org.eclipse.core.runtime.SubMonitor;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.m2e.core.project.IMavenProjectFacade;
 import org.eclipse.m2e.core.project.MavenProjectUtils;
 import org.eclipse.m2e.core.project.configurator.AbstractProjectConfigurator;
 import org.eclipse.pde.core.build.IBuildEntry;
 import org.eclipse.pde.core.build.IBuildModel;
 import org.eclipse.pde.core.plugin.IPluginModelBase;
 import org.eclipse.pde.core.plugin.PluginRegistry;
+import org.eclipse.pde.internal.core.natures.PDE;
 
 public class PDEProjectHelper {
 
@@ -101,6 +105,19 @@ public class PDEProjectHelper {
 			setClasspath(project, model, monitor);
 		} else {
 			addProjectForUpdateClasspath(project);
+		}
+	}
+
+	@SuppressWarnings("restriction")
+	static void configurePDEFeatureProject(IMavenProjectFacade projectFacade, IProgressMonitor monitor)
+			throws CoreException {
+		IProject project = projectFacade.getProject();
+		if (project != null) {
+			// see
+			// org.eclipse.pde.internal.ui.wizards.feature.AbstractCreateFeatureOperation
+			if (!project.hasNature(PDE.FEATURE_NATURE)) {
+				AbstractProjectConfigurator.addNature(project, PDE.FEATURE_NATURE, monitor);
+			}
 		}
 	}
 

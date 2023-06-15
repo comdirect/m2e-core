@@ -1,14 +1,14 @@
 /*******************************************************************************
- * Copyright (c) 2022 Christoph Läubrich
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v2.0
- * which accompanies this distribution, and is available at
- * https://www.eclipse.org/legal/epl-v20.html
+ * Copyright (c) 2022, 2023 Christoph Läubrich and others
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0.
  *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *      Christoph Läubrich - initial API and implementation
+ *   Christoph Läubrich - initial API and implementation
  *******************************************************************************/
 package org.eclipse.m2e.pde.target;
 
@@ -41,11 +41,9 @@ public class MavenTargetDependencyFilter implements DependencyFilter {
 		String extension = node.getArtifact().getExtension();
 		for (String valid : VALID_EXTENSIONS) {
 			// only for a valid extension...
-			if (valid.equalsIgnoreCase(extension)) {
-				if (dependencyDepth == DependencyDepth.INFINITE
-						|| (dependencyDepth == DependencyDepth.DIRECT && parents.size() <= 1)) {
-					return isValidScope(node.getDependency());
-				}
+			if (valid.equalsIgnoreCase(extension) && (dependencyDepth == DependencyDepth.INFINITE
+					|| (dependencyDepth == DependencyDepth.DIRECT && parents.size() <= 1))) {
+				return isValidScope(node.getDependency());
 			}
 		}
 		return false;
@@ -59,12 +57,7 @@ public class MavenTargetDependencyFilter implements DependencyFilter {
 		if (locationScopes.isEmpty()) {
 			return SCOPE_COMPILE.equalsIgnoreCase(dependecyScope);
 		}
-		for (String locationScope : locationScopes) {
-			if (dependecyScope.equalsIgnoreCase(locationScope)) {
-				return true;
-			}
-		}
-		return false;
+		return locationScopes.stream().anyMatch(dependecyScope::equalsIgnoreCase);
 	}
 
 	static final Collection<String> expandScope(String scope) {

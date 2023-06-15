@@ -129,7 +129,7 @@ public class Messages extends NLS {
 
   public static String LifecycleMappingPage_numErrors;
 
-  public static String LifecycleMappingPage_resolveLaterDescription;
+  public static String LifecycleMappingPage_useDefaultMapping;
 
   public static String LifecycleMappingPage_title;
 
@@ -156,6 +156,8 @@ public class Messages extends NLS {
   public static String LifecycleMappingPropertyPage_showLIfecyclePhases;
 
   public static String LifecycleMappingPropertyPage_invalidPom;
+
+  public static String LifecycleMappingPreferencePage_DefaultMojoExecution;
 
   public static String LocalArchetypeCatalogDialog_btnBrowse;
 
@@ -400,6 +402,8 @@ public class Messages extends NLS {
   public static String MavenPomWizardPage_title;
 
   public static String MavenPreferencePage_changingPreferencesRequiresProjectUpdate;
+
+  public static String MavenPreferencePage_queryCentralToIdentifyArtifacts;
 
   public static String MavenPreferencePage_download;
 

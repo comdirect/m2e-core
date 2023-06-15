@@ -15,9 +15,10 @@
 package org.eclipse.m2e.core.ui.internal.wizards;
 
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 import org.eclipse.core.resources.IProject;
-import org.eclipse.core.resources.WorkspaceJob;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
@@ -27,6 +28,9 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.PlatformUI;
 
+import org.eclipse.m2e.core.internal.jobs.MavenWorkspaceJob;
+import org.eclipse.m2e.core.internal.lifecyclemapping.discovery.ILifecycleMappingRequirement;
+import org.eclipse.m2e.core.internal.lifecyclemapping.discovery.IMavenDiscoveryProposal;
 
 
 /**
@@ -35,13 +39,28 @@ import org.eclipse.ui.PlatformUI;
  * @author Fred Bricon
  * @since 1.6.0
  */
-public class MappingDiscoveryJob extends WorkspaceJob {
+public class MappingDiscoveryJob extends MavenWorkspaceJob {
 
   private final Collection<IProject> projects;
 
+  private boolean skipOnEmpty;
+
+  @Deprecated
   public MappingDiscoveryJob(Collection<IProject> projects) {
+    this(projects, false);
+  }
+
+  /**
+   * Creates a new discovery job for the given set of projects
+   * 
+   * @param projects the projects to discover
+   * @param skipOnEmpty if <code>true</code> nothing will be done if no new proposals can be discovered, otherwise the
+   *          dialog is even shown if nothing new was discovered just showing possible unmatched items
+   */
+  public MappingDiscoveryJob(Collection<IProject> projects, boolean skipOnEmpty) {
     super("Discover lifecycle mappings");
     this.projects = projects;
+    this.skipOnEmpty = skipOnEmpty;
 
   }
 
@@ -55,7 +74,11 @@ public class MappingDiscoveryJob extends WorkspaceJob {
     }
     //Some errors were detected
     discoverProposals(discoveryRequest, monitor);
-
+    Map<ILifecycleMappingRequirement, List<IMavenDiscoveryProposal>> proposals = discoveryRequest.getAllProposals();
+    if(proposals.isEmpty() && skipOnEmpty) {
+      //if we can not propose anything, why open the dialog?
+      return Status.CANCEL_STATUS;
+    }
     openProposalWizard(projects, discoveryRequest);
 
     return Status.OK_STATUS;

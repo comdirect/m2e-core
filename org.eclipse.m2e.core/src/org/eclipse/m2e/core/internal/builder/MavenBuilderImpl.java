@@ -24,17 +24,19 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IMarker;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IResourceDelta;
 import org.eclipse.core.resources.IncrementalProjectBuilder;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -103,7 +105,11 @@ public class MavenBuilderImpl {
     MavenProject mavenProject = projectFacade.getMavenProject();
     IProject project = projectFacade.getProject();
 
-    IResourceDelta delta = getDeltaProvider().getDelta(project);
+    DeltaProvider deltaProvider = getDeltaProvider();
+    IResourceDelta delta = deltaProvider.getDelta(project);
+    if(!hasRelevantDelta(projectFacade, delta)) {
+      return Set.of(project);
+    }
 
     final BuildResultCollector participantResults = new BuildResultCollector();
     List<BuildContext> incrementalContexts = setupProjectBuildContext(project, kind, delta, participantResults);
@@ -113,17 +119,15 @@ public class MavenBuilderImpl {
     Map<Throwable, MojoExecutionKey> buildErrors = new LinkedHashMap<>();
     MavenProjectMutableState snapshot = MavenProjectMutableState.takeSnapshot(mavenProject);
     try {
-      for(Entry<MojoExecutionKey, List<AbstractBuildParticipant>> entry : participants.entrySet()) {
-        MojoExecutionKey mojoExecutionKey = entry.getKey();
-        for(InternalBuildParticipant participant : entry.getValue()) {
+      participants.forEach((mojoExecutionKey, buildParticipants) -> {
+        for(InternalBuildParticipant participant : buildParticipants) {
           Set<File> debugRefreshFiles = !debugHooks.isEmpty() ? new LinkedHashSet<>(participantResults.getFiles())
               : null;
-
           log.debug("Executing build participant {} for plugin execution {}", participant.getClass().getName(),
               mojoExecutionKey);
           participantResults.setParticipantId(mojoExecutionKey.getKeyString() + "-" + participant.getClass().getName());
           participant.setMavenProjectFacade(projectFacade);
-          participant.setGetDeltaCallback(getDeltaProvider());
+          participant.setGetDeltaCallback(deltaProvider);
           participant.setSession(session);
           participant.setBuildContext((AbstractEclipseBuildContext) incrementalContexts.get(0));
           if(participant instanceof InternalBuildParticipant2 participant2) {
@@ -157,7 +161,7 @@ public class MavenBuilderImpl {
           debugBuildParticipant(debugHooks, projectFacade, mojoExecutionKey, (AbstractBuildParticipant) participant,
               diff(debugRefreshFiles, participantResults.getFiles()), monitor);
         }
-      }
+      });
     } catch(Exception e) {
       log.debug("Unexpected build exception", e);
       buildErrors.put(e, null);
@@ -167,7 +171,7 @@ public class MavenBuilderImpl {
         context.release();
       }
     }
-
+    
     // Refresh files modified by build participants/maven plugins
     refreshResources(project, participantResults.getFiles(), monitor);
 
@@ -176,6 +180,44 @@ public class MavenBuilderImpl {
     processBuildResults(project, mavenProject, result, participantResults, buildErrors);
 
     return dependencies;
+  }
+
+  private boolean hasRelevantDelta(IMavenProjectFacade projectFacade, IResourceDelta resourceDelta)
+      throws CoreException {
+    if(resourceDelta == null) {
+      return true;
+    }
+    IProject project = projectFacade.getProject();
+    IPath buildOutputLocation = projectFacade.getBuildOutputLocation();
+    if(project == null || buildOutputLocation == null) {
+      return true;
+    }
+    IPath projectPath = project.getFullPath();
+    List<IPath> moduleLocations = projectFacade.getMavenProjectModules().stream()
+        .map(module -> projectPath.append(module)).toList();
+    AtomicBoolean hasRelevantDelta = new AtomicBoolean();
+    resourceDelta.accept(delta -> {
+      IResource resource = delta.getResource();
+      if(resource instanceof IFile) {
+        IPath fullPath = delta.getFullPath();
+        if(buildOutputLocation.isPrefixOf(fullPath)) {
+          //anything in the build output is not interesting for a change as it is produced by the build
+          //lets see if there are more interesting parts...
+          return true;
+        }
+        for(IPath modulePath : moduleLocations) {
+          if(modulePath.isPrefixOf(fullPath)) {
+            //this is a change in a child module so this one is not really affected and the child will be (possibly) build directly.
+            return true;
+          }
+        }
+        //anything else has changed, so mark this as relevant an leave the loop
+        hasRelevantDelta.set(true);
+        return false;
+      }
+      return true;
+    });
+    return hasRelevantDelta.get();
   }
 
   private List<IIncrementalBuildFramework.BuildContext> setupProjectBuildContext(IProject project, int kind,
@@ -230,6 +272,13 @@ public class MavenBuilderImpl {
 
   private void refreshResources(IProject project, Collection<File> resources, IProgressMonitor monitor)
       throws CoreException {
+    if(isAutoRefresh()) {
+      //if autorefresh is on, resources will be refreshed automatically
+      return;
+    }
+    //1st is to refresh all project resources, just to make sure if anything has changed during the build will become visible to eclipse
+    project.refreshLocal(IResource.DEPTH_INFINITE, monitor);
+    //2nd is to refresh all explicitly updated resources by named files...
     for(File file : resources) {
       IPath path = MavenProjectUtils.getProjectRelativePath(project, file.getAbsolutePath());
       if(path == null) {
@@ -263,33 +312,35 @@ public class MavenBuilderImpl {
     }
   }
 
+  @SuppressWarnings("deprecation")
+  private boolean isAutoRefresh() {
+    return ResourcesPlugin.getPlugin().getPluginPreferences().getBoolean(ResourcesPlugin.PREF_AUTO_REFRESH);
+  }
+
   private void processBuildResults(IProject project, MavenProject mavenProject, MavenExecutionResult result,
       BuildResultCollector results, Map<Throwable, MojoExecutionKey> buildErrors) {
     IMavenMarkerManager markerManager = MavenPluginActivator.getDefault().getMavenMarkerManager();
 
     // Remove obsolete markers for problems reported by build participants
-    for(Entry<String, List<File>> entry : results.getRemoveMessages().entrySet()) {
-      String buildParticipantId = entry.getKey();
-      for(File file : entry.getValue()) {
+    results.getRemoveMessages().forEach((buildParticipantId, files) -> {
+      for(File file : files) {
         deleteBuildParticipantMarkers(project, markerManager, file, buildParticipantId);
       }
-    }
+    });
 
     // Create new markers for problems reported by build participants
-    for(Entry<String, List<Message>> messageEntry : results.getMessages().entrySet()) {
-      String buildParticipantId = messageEntry.getKey();
-      for(Message buildMessage : messageEntry.getValue()) {
+    results.getMessages().forEach((buildParticipantId, messages) -> {
+      for(Message buildMessage : messages) {
         addBuildParticipantMarker(project, markerManager, buildMessage, buildParticipantId);
 
-        if(buildMessage.cause != null && buildErrors.containsKey(buildMessage.cause)) {
-          buildErrors.remove(buildMessage.cause);
+        if(buildMessage.cause() != null) {
+          buildErrors.remove(buildMessage.cause());
         }
       }
-    }
+    });
 
     // Create markers for the build errors linked to mojo/plugin executions
-    for(Throwable error : buildErrors.keySet()) {
-      MojoExecutionKey mojoExecutionKey = buildErrors.get(error);
+    buildErrors.forEach((error, mojoExecutionKey) -> {
       SourceLocation markerLocation;
       if(mojoExecutionKey != null) {
         markerLocation = SourceLocationHelper.findLocation(mavenProject, mojoExecutionKey);
@@ -299,7 +350,7 @@ public class MavenBuilderImpl {
       BuildProblemInfo problem = new BuildProblemInfo(error, mojoExecutionKey, markerLocation);
       markerManager.addErrorMarker(project.getFile(IMavenConstants.POM_FILE_NAME), IMavenConstants.MARKER_BUILD_ID,
           problem);
-    }
+    });
 
     if(result.hasExceptions()) {
       markerManager.addMarkers(project.getFile(IMavenConstants.POM_FILE_NAME), IMavenConstants.MARKER_BUILD_ID, result);
@@ -323,15 +374,15 @@ public class MavenBuilderImpl {
   private void addBuildParticipantMarker(IProject project, IMavenMarkerManager markerManager, Message buildMessage,
       String buildParticipantId) {
 
-    IResource resource = MavenProjectUtils.getProjectResource(project, buildMessage.file);
+    IResource resource = MavenProjectUtils.getProjectResource(project, buildMessage.file());
     if(resource == null) {
       resource = project.getFile(IMavenConstants.POM_FILE_NAME);
     }
     int at = buildParticipantId.lastIndexOf('-');
     String pluginExecutionKey = buildParticipantId.substring(0, at);
-    String message = buildMessage.message + " (" + pluginExecutionKey + ')'; //$NON-NLS-1$
+    String message = buildMessage.message() + " (" + pluginExecutionKey + ')'; //$NON-NLS-1$
     IMarker marker = markerManager.addMarker(resource, IMavenConstants.MARKER_BUILD_PARTICIPANT_ID, message,
-        buildMessage.line, buildMessage.severity);
+        buildMessage.line(), buildMessage.severity());
     try {
       marker.setAttribute(BUILD_PARTICIPANT_ID_ATTR_NAME, buildParticipantId);
     } catch(CoreException ex) {
@@ -353,9 +404,8 @@ public class MavenBuilderImpl {
 
     Map<Throwable, MojoExecutionKey> buildErrors = new LinkedHashMap<>();
     try {
-      for(Entry<MojoExecutionKey, List<AbstractBuildParticipant>> entry : participants.entrySet()) {
-        MojoExecutionKey mojoExecutionKey = entry.getKey();
-        for(InternalBuildParticipant participant : entry.getValue()) {
+      participants.forEach((mojoExecutionKey, buildParticipants) -> {
+        for(InternalBuildParticipant participant : buildParticipants) {
           participantResults.setParticipantId(mojoExecutionKey.getKeyString() + "-" + participant.getClass().getName());
           participant.setMavenProjectFacade(projectFacade);
           participant.setGetDeltaCallback(getDeltaProvider());
@@ -375,7 +425,7 @@ public class MavenBuilderImpl {
             processMavenSessionErrors(session, mojoExecutionKey, buildErrors);
           }
         }
-      }
+      });
     } catch(Exception e) {
       buildErrors.put(e, null);
     } finally {

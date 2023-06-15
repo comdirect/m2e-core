@@ -15,17 +15,26 @@
 package org.eclipse.m2e.core.project;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Stream;
+
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.ParseException;
 
 import org.eclipse.core.resources.IProject;
 
-import org.eclipse.m2e.core.internal.embedder.PlexusContainerManager;
+import org.eclipse.m2e.core.internal.MavenPluginActivator;
+import org.eclipse.m2e.core.internal.embedder.MavenProperties;
 
 
 /**
@@ -45,14 +54,23 @@ public class ResolverConfiguration implements Serializable, IProjectConfiguratio
 
   private Properties properties;
 
+  private Map<String, String> userProperties;
+
   private File multiModuleProjectDirectory;
+
+  private List<String> activeProfiles;
+
+  private List<String> inactiveProfiles;
+
+  private List<String> userActiveProfiles;
+
+  private List<String> userInactiveProfiles;
 
   public ResolverConfiguration() {
   }
 
   public ResolverConfiguration(IProject project) {
-    setMultiModuleProjectDirectory(
-        PlexusContainerManager.computeMultiModuleProjectDirectory(project.getLocation().toFile()));
+    setMultiModuleProjectDirectory(MavenProperties.computeMultiModuleProjectDirectory(project));
   }
 
   /**
@@ -91,6 +109,14 @@ public class ResolverConfiguration implements Serializable, IProjectConfiguratio
     return Collections.unmodifiableMap(map);
   }
 
+  @Override
+  public Map<String, String> getUserProperties() {
+    if(userProperties == null) {
+      return Collections.emptyMap();
+    }
+    return userProperties;
+  }
+
   public void setProperties(Properties properties) {
     this.properties = properties;
   }
@@ -122,6 +148,8 @@ public class ResolverConfiguration implements Serializable, IProjectConfiguratio
 
   public void setSelectedProfiles(String profiles) {
     this.selectedProfiles = profiles;
+    this.activeProfiles = parseProfiles(profiles, true);
+    this.inactiveProfiles = parseProfiles(profiles, false);
   }
 
 
@@ -148,24 +176,15 @@ public class ResolverConfiguration implements Serializable, IProjectConfiguratio
     if(this == obj) {
       return true;
     }
-    if(obj == null) {
-      return false;
+    if(obj instanceof IProjectConfiguration other) {
+      return IProjectConfiguration.contentsEquals(this, other);
     }
-    if(obj.getClass() != this.getClass()) {
-      return false;
-    }
-    ResolverConfiguration other = (ResolverConfiguration) obj;
-    return this.resolveWorkspaceProjects == other.resolveWorkspaceProjects
-        && Objects.equals(this.selectedProfiles, other.selectedProfiles)
-        && Objects.equals(this.lifecycleMappingId, other.lifecycleMappingId)
-        && Objects.equals(this.properties, other.properties)
-        && Objects.equals(this.multiModuleProjectDirectory, other.multiModuleProjectDirectory);
+    return false;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(resolveWorkspaceProjects, selectedProfiles, lifecycleMappingId, properties,
-        multiModuleProjectDirectory);
+    return IProjectConfiguration.contentsHashCode(this);
   }
 
   /* (non-Javadoc)
@@ -180,6 +199,67 @@ public class ResolverConfiguration implements Serializable, IProjectConfiguratio
    * @param multiModuleProjectDirectory The multiModuleProjectDirectory to set.
    */
   public void setMultiModuleProjectDirectory(File multiModuleProjectDirectory) {
-    this.multiModuleProjectDirectory = multiModuleProjectDirectory;
+    if(!Objects.equals(this.multiModuleProjectDirectory, multiModuleProjectDirectory)) {
+      this.multiModuleProjectDirectory = multiModuleProjectDirectory;
+      try {
+        CommandLine commandLine = MavenProperties.getMavenArgs(multiModuleProjectDirectory);
+        Map<String, String> props = new LinkedHashMap<>();
+        MavenProperties.getCliProperties(commandLine, props::put);
+        userProperties = Collections.unmodifiableMap(props);
+        userActiveProfiles = new ArrayList<>();
+        userInactiveProfiles = new ArrayList<>();
+        MavenProperties.getProfiles(commandLine, userActiveProfiles::add, userInactiveProfiles::add);
+      } catch(IOException | ParseException ex) {
+        //can't use it then... :-(
+        MavenPluginActivator.getDefault().getLog().error("can't read maven args from " + multiModuleProjectDirectory,
+            ex);
+      }
+    }
+  }
+
+  @Override
+  public List<String> getActiveProfileList() {
+    if(activeProfiles == null) {
+      if(userActiveProfiles != null) {
+        return List.copyOf(userActiveProfiles);
+      }
+      return List.of();
+    }
+    if(userActiveProfiles != null) {
+      return Stream.concat(userActiveProfiles.stream(), activeProfiles.stream()).distinct().toList();
+    }
+    return List.copyOf(activeProfiles);
+  }
+
+  @Override
+  public List<String> getInactiveProfileList() {
+    if(inactiveProfiles == null) {
+      if(userInactiveProfiles != null) {
+        return List.copyOf(userInactiveProfiles);
+      }
+      return List.of();
+    }
+    if(userInactiveProfiles != null) {
+      return Stream.concat(userInactiveProfiles.stream(), inactiveProfiles.stream()).distinct().toList();
+    }
+    return List.copyOf(inactiveProfiles);
+  }
+
+  private static List<String> parseProfiles(String profilesAsText, boolean status) {
+    List<String> profiles;
+    if(profilesAsText != null && profilesAsText.trim().length() > 0) {
+      String[] profilesArray = profilesAsText.split("[,\\s\\|]");
+      profiles = new ArrayList<>(profilesArray.length);
+      for(String profile : profilesArray) {
+        boolean isActive = !profile.startsWith("!");
+        if(status == isActive) {
+          profile = (isActive) ? profile : profile.substring(1);
+          profiles.add(profile);
+        }
+      }
+    } else {
+      profiles = new ArrayList<>(0);
+    }
+    return profiles;
   }
 }

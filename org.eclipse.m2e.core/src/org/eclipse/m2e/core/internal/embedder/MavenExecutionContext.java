@@ -54,6 +54,7 @@ import org.apache.maven.execution.MavenExecutionRequestPopulator;
 import org.apache.maven.execution.MavenExecutionResult;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.lifecycle.internal.DependencyContext;
+import org.apache.maven.lifecycle.internal.LifecycleExecutionPlanCalculator;
 import org.apache.maven.lifecycle.internal.MojoExecutor;
 import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.LegacySupport;
@@ -115,7 +116,7 @@ public class MavenExecutionContext implements IMavenExecutionContext {
    */
   public MavenExecutionContext(IComponentLookup lookup, File baseDir,
       Function<? super MavenExecutionContext, MavenProject> projectSupplier) {
-    this(lookup, baseDir, PlexusContainerManager.computeMultiModuleProjectDirectory(baseDir), projectSupplier);
+    this(lookup, baseDir, MavenProperties.computeMultiModuleProjectDirectory(baseDir), projectSupplier);
   }
 
   public MavenExecutionContext(IComponentLookup lookup, File baseDir, File multiModuleProjectDirectory,
@@ -317,20 +318,26 @@ public class MavenExecutionContext implements IMavenExecutionContext {
     }
   }
 
-  private static void executeMojo(MavenSession session, MojoExecution execution, IComponentLookup lookup) {
+  private static void executeMojo(MavenSession session, MojoExecution execution, IComponentLookup lookup)
+      throws CoreException {
     Map<MavenProject, Set<Artifact>> artifacts = new HashMap<>();
     Map<MavenProject, MavenProjectMutableState> snapshots = new HashMap<>();
     for(MavenProject project : session.getProjects()) {
       artifacts.put(project, new LinkedHashSet<>(project.getArtifacts()));
       snapshots.put(project, MavenProjectMutableState.takeSnapshot(project));
     }
+    MojoExecution clone = cloneMojoExecution(execution);
     try {
+      MavenProject currentProject = session.getCurrentProject();
+      LifecycleExecutionPlanCalculator executionPlanCalculator = lookup.lookup(LifecycleExecutionPlanCalculator.class);
+      executionPlanCalculator.setupMojoExecution(session, currentProject, clone);
       MojoExecutor mojoExecutor = lookup.lookup(MojoExecutor.class);
-      DependencyContext dependencyContext = mojoExecutor.newDependencyContext(session, List.of(execution));
-      mojoExecutor.ensureDependenciesAreResolved(execution.getMojoDescriptor(), session, dependencyContext);
-      lookup.lookup(BuildPluginManager.class).executeMojo(session, execution);
+      DependencyContext dependencyContext = mojoExecutor.newDependencyContext(session, List.of(clone));
+      mojoExecutor.ensureDependenciesAreResolved(clone.getMojoDescriptor(), session, dependencyContext);
+      BuildPluginManager buildPluginManager = lookup.lookup(BuildPluginManager.class);
+      buildPluginManager.executeMojo(session, clone);
     } catch(Exception ex) {
-      session.getResult().addException(ex);
+      throw new CoreException(Status.error("Failed to execute mojo " + clone, ex));
     } finally {
       for(MavenProject project : session.getProjects()) {
         project.setArtifactFilter(null);
@@ -344,6 +351,26 @@ public class MavenExecutionContext implements IMavenExecutionContext {
     }
   }
 
+  private static MojoExecution cloneMojoExecution(MojoExecution execution) {
+    MojoExecution clone = new MojoExecution(execution.getPlugin(), execution.getGoal(), execution.getExecutionId());
+    //FIXME something's wrong with this "cloning" approach, as we lose the original mojoDescriptor.
+    // Intuitively, something like the following looks more "right", as it would clone the mojoDescriptor, 
+    // in order to avoid any caching shenanigans as mentioned in https://github.com/eclipse-m2e/m2e-core/issues/1304#issuecomment-1457955512.
+    // but even cloning the descriptor leads to an occurrence of https://github.com/eclipse-m2e/m2e-core/issues/1150 on project import
+    //    var descriptor = execution.getMojoDescriptor();
+    //    if(descriptor != null) {
+    //      clone = new MojoExecution(execution.getPlugin(), execution.getGoal(), execution.getExecutionId());
+    //    } else {
+    //      clone = new MojoExecution(descriptor.clone(), execution.getExecutionId(), execution.getSource());
+    //    }
+    clone.setConfiguration(execution.getConfiguration());
+    clone.setLifecyclePhase(execution.getLifecyclePhase());
+    execution.getForkedExecutions().forEach((k, v) -> {
+      clone.setForkedExecutions(k, v);
+    });
+    return clone;
+  }
+
   private <V> V executeBare(MavenProject project, ICallable<V> callable, IProgressMonitor monitor)
       throws CoreException {
     final MavenSession mavenSession = getSession();
@@ -352,6 +379,7 @@ public class MavenExecutionContext implements IMavenExecutionContext {
         .setTransferListener(new ArtifactTransferListenerAdapter(monitor));
     final MavenProject origProject = mavenSession.getCurrentProject();
     final List<MavenProject> origProjects = mavenSession.getProjects();
+    final List<MavenProject> origAllProjects = mavenSession.getAllProjects();
     final ClassLoader origTCCL = Thread.currentThread().getContextClassLoader();
     try {
       if(project == null && projectSupplier != null) {
@@ -359,7 +387,9 @@ public class MavenExecutionContext implements IMavenExecutionContext {
       }
       if(project != null) {
         mavenSession.setCurrentProject(project);
-        mavenSession.setProjects(Collections.singletonList(project));
+        List<MavenProject> projects = Collections.singletonList(project);
+        mavenSession.setProjects(projects);
+        mavenSession.setAllProjects(projects);
       }
       return callable.call(this, IProgressMonitor.nullSafe(monitor));
     } finally {
@@ -368,6 +398,7 @@ public class MavenExecutionContext implements IMavenExecutionContext {
       if(project != null) {
         mavenSession.setCurrentProject(origProject);
         mavenSession.setProjects(origProjects != null ? origProjects : Collections.<MavenProject> emptyList());
+        mavenSession.setAllProjects(origAllProjects != null ? origAllProjects : Collections.<MavenProject> emptyList());
       }
     }
   }

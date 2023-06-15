@@ -1,15 +1,15 @@
 /*******************************************************************************
- * Copyright (c) 2018, 2022 Christoph Läubrich
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v2.0
- * which accompanies this distribution, and is available at
- * https://www.eclipse.org/legal/epl-v20.html
+ * Copyright (c) 2018, 2023 Christoph Läubrich and others
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0.
  *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *      Christoph Läubrich - initial API and implementation
- *      Patrick Ziegler - Support contribution of Eclipse features via Maven repositories
+ *   Christoph Läubrich - initial API and implementation
+ *   Patrick Ziegler - Support contribution of Eclipse features via Maven repositories
  *******************************************************************************/
 package org.eclipse.m2e.pde.target;
 
@@ -18,11 +18,11 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 
 import org.apache.commons.io.FileUtils;
@@ -142,7 +143,7 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		this.dependencyScopes = dependencyScopes;
 		this.includeSource = includeSource;
 		for (BNDInstructions instr : instructions) {
-			instructionsMap.put(instr.getKey(), instr);
+			instructionsMap.put(instr.key(), instr);
 		}
 		excludedArtifacts.addAll(excludes);
 		for (MavenTargetDependency root : roots) {
@@ -153,7 +154,7 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 	@Override
 	protected TargetBundle[] resolveBundles(ITargetDefinition definition, IProgressMonitor monitor)
 			throws CoreException {
-		return resolveArtifacts(definition, monitor).stream().flatMap(tb -> tb.bundles.entrySet().stream())
+		return resolveArtifacts(definition, monitor).stream().flatMap(tb -> tb.bundles())
 				.filter(e -> !isExcluded(e.getKey())).map(Entry::getValue).toArray(TargetBundle[]::new);
 	}
 
@@ -166,9 +167,6 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 			List<ArtifactRepository> repositories = getAvailableArtifactRepositories(maven);
 			SubMonitor subMonitor = SubMonitor.convert(monitor, roots.size() * 100);
 			for (MavenTargetDependency root : roots) {
-				if (subMonitor.isCanceled()) {
-					break;
-				}
 				resolveDependency(root, maven, repositories, bundles, cacheManager, subMonitor.split(100));
 			}
 			if (featureTemplate != null) {
@@ -177,9 +175,8 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 					generateFeature(bundles, true);
 				}
 			}
-			Iterator<IModel> iterator = bundles.features.stream().map(tf -> tf.getFeatureModel()).iterator();
-			while (iterator.hasNext()) {
-				IModel model = iterator.next();
+			Iterable<IModel> models = bundles.features.stream().map(TargetFeature::getFeatureModel)::iterator;
+			for (IModel model : models) {
 				model.load();
 			}
 			if (subMonitor.isCanceled()) {
@@ -201,27 +198,23 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		IFeature feature = featureModel.getFeature();
 		if (source) {
 			feature.setId(feature.getId() + SOURCE_SUFFIX);
-			String label = feature.getLabel();
-			if (label != null && !label.isBlank()) {
-				feature.setLabel(label + " (source)");
+			String featureLabel = feature.getLabel();
+			if (featureLabel != null && !featureLabel.isBlank()) {
+				feature.setLabel(featureLabel + " (source)");
 			}
-			for (IFeaturePlugin plugin : feature.getPlugins()) {
-				if (!plugin.getId().endsWith(SOURCE_SUFFIX)) {
-					feature.removePlugins(new IFeaturePlugin[] { plugin });
-				}
-			}
+			Stream<IFeaturePlugin> nonSourcePlugins = Arrays.stream(feature.getPlugins())
+					.filter(p -> !p.getId().endsWith(SOURCE_SUFFIX));
+			feature.removePlugins(nonSourcePlugins.toArray(IFeaturePlugin[]::new));
 		} else {
 			bundleFilter = Predicate.not(bundleFilter);
 		}
-		Iterator<TargetBundle> featurePlugins = bundles.bundles.entrySet().stream() //
+		Iterable<TargetBundle> featurePlugins = bundles.bundles() //
 				.filter(e -> !isExcluded(e.getKey()) && !isIgnored(e.getKey()))//
 				.map(Entry::getValue)//
 				.filter(bundleFilter)//
 				.sorted(Comparator.comparing(TargetBundle::getBundleInfo,
-						Comparator.comparing(BundleInfo::getSymbolicName)))
-				.iterator();
-		while (featurePlugins.hasNext()) {
-			TargetBundle targetBundle = featurePlugins.next();
+						Comparator.comparing(BundleInfo::getSymbolicName)))::iterator;
+		for (TargetBundle targetBundle : featurePlugins) {
 			feature.addPlugins(new IFeaturePlugin[] { new MavenFeaturePlugin(targetBundle, featureModel) });
 		}
 		featureModel.makeReadOnly();
@@ -248,12 +241,13 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		}
 		if (artifact != null) {
 			DependencyDepth depth = dependencyDepth;
-			if (POM_PACKAGE_TYPE.equals(artifact.getExtension()) && depth == DependencyDepth.NONE) {
+			if (isPomType(artifact) && depth == DependencyDepth.NONE) {
 				// fetching only the pom but no dependencies does not makes much sense...
 				depth = DependencyDepth.DIRECT;
 			}
+			SubMonitor split = subMonitor.split(20);
 			if (depth == DependencyDepth.DIRECT || depth == DependencyDepth.INFINITE) {
-				ICallable<PreorderNodeListGenerator> callable = new DependencyNodeGenerator(root, artifact, depth,
+				ICallable<PreorderNodeListGenerator> callable = DependencyNodeGenerator.create(root, artifact, depth,
 						dependencyScopes, repositories, this);
 				PreorderNodeListGenerator dependecies;
 				if (workspaceProject == null) {
@@ -261,16 +255,18 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 				} else {
 					dependecies = registry.execute(workspaceProject, callable, subMonitor);
 				}
-				for (Artifact a : dependecies.getArtifacts(true)) {
+				List<Artifact> artifacts = dependecies.getArtifacts(true);
+				split.setWorkRemaining(artifacts.size());
+				for (Artifact a : artifacts) {
 					if (a.getFile() == null) {
 						// this is a filtered dependency
 						continue;
 					}
-					addBundleForArtifact(a, cacheManager, maven, targetBundles);
+					addBundleForArtifact(a, cacheManager, maven, targetBundles, split.split(1));
 				}
 				targetBundles.dependencyNodes.put(root, dependecies.getNodes());
 			} else {
-				addBundleForArtifact(artifact, cacheManager, maven, targetBundles);
+				addBundleForArtifact(artifact, cacheManager, maven, targetBundles, split);
 			}
 		}
 
@@ -283,8 +279,8 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 
 	private File getFeatureFile(Artifact artifact, CacheManager cacheManager) {
 		File baseFile = artifact.getFile();
-		
-		if(baseFile == null) {
+
+		if (baseFile == null) {
 			return null;
 		} else if (baseFile.isDirectory()) {
 			File featureFile = new File(baseFile, ICoreConstants.FEATURE_FILENAME_DESCRIPTOR);
@@ -292,55 +288,54 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		} else if (DEFAULT_PACKAGE_TYPE.equals(FilenameUtils.getExtension(baseFile.getName()))) {
 			return unpackFeatureFile(artifact, cacheManager);
 		}
-		
+
 		return null;
 	}
-	
+
 	private File unpackFeatureFile(Artifact artifact, CacheManager cacheManager) {
 		try {
 			return cacheManager.accessArtifactFile(artifact, file -> {
 				// Unpack feature.xml into the same directory as the jar
 				File featureFile = new File(file.getParentFile(), ICoreConstants.FEATURE_FILENAME_DESCRIPTOR);
-				
+
 				// May have already been unpacked -> reuse
-				if(featureFile.exists()) {
+				if (featureFile.exists()) {
 					return featureFile;
 				}
-				
+
 				File markerFile = new File(file.getParentFile(), NOT_A_FEATURE);
-				
+
 				// Artifact has already been checked during an earlier cycle
-				if(markerFile.exists() && markerFile.lastModified() >= file.lastModified()) {
+				if (markerFile.exists() && markerFile.lastModified() >= file.lastModified()) {
 					return null;
 				}
-				
+
 				try (JarFile jar = new JarFile(artifact.getFile())) {
 					ZipEntry entry = jar.getEntry(ICoreConstants.FEATURE_FILENAME_DESCRIPTOR);
-					
+
 					// feature.xml is missing -> not an Eclipse feature
-					if(entry == null) {
+					if (entry == null) {
 						FileUtils.touch(markerFile);
 						return null;
 					}
-					
 					Files.copy(jar.getInputStream(entry), featureFile.toPath());
-					
+
 					return featureFile;
-				} catch(IOException e) {
+				} catch (IOException e) {
 					LOGGER.error(e.getLocalizedMessage(), e);
 					return null;
 				}
 			});
-		} catch(Exception e) {
+		} catch (Exception e) {
 			LOGGER.error(e.getLocalizedMessage(), e);
 			return null;
 		}
 	}
 
 	private void addBundleForArtifact(Artifact artifact, CacheManager cacheManager, IMaven maven,
-			TargetBundles targetBundles) {
+			TargetBundles targetBundles, IProgressMonitor monitor) {
 		File featureFile = getFeatureFile(artifact, cacheManager);
-		
+
 		if (isPomType(artifact)) {
 			targetBundles.features
 					.add(new MavenTargetFeature(new MavenPomFeatureModel(artifact, targetBundles, false)));
@@ -357,27 +352,21 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 				LOGGER.error(e.getLocalizedMessage(), e);
 			}
 			return;
-		}		
-		BNDInstructions bndInstructions = instructionsMap.get(getKey(artifact));
-		if (bndInstructions == null) {
-			// no specific instructions for this artifact, try using the location default
-			// then
-			bndInstructions = instructionsMap.get("");
 		}
-		MavenTargetBundle bundle = cacheManager.getTargetBundle(artifact, bndInstructions, metadataMode);
+		MavenTargetBundle bundle = new MavenTargetBundle(artifact, this, monitor);
 		IStatus status = bundle.getStatus();
 		if (status.isOK()) {
-			targetBundles.bundles.put(artifact, bundle);
+			targetBundles.addBundle(artifact, bundle);
 			if (includeSource) {
 				try {
 					List<ArtifactRepository> repositories = getAvailableArtifactRepositories(maven);
-					Artifact resolve = RepositoryUtils.toArtifact(maven.resolve(artifact.getGroupId(),
-							artifact.getArtifactId(), artifact.getBaseVersion(), artifact.getExtension(), "sources",
-							repositories, new NullProgressMonitor()));
-					MavenSourceBundle sourceBundle = new MavenSourceBundle(bundle.getBundleInfo(), resolve,
+					Artifact sourceArtifact = RepositoryUtils.toArtifact(
+							maven.resolve(artifact.getGroupId(), artifact.getArtifactId(), artifact.getBaseVersion(),
+									artifact.getExtension(), "sources", repositories, new NullProgressMonitor()));
+					MavenSourceBundle sourceBundle = new MavenSourceBundle(bundle.getBundleInfo(), sourceArtifact,
 							cacheManager);
-					targetBundles.bundles.put(resolve, sourceBundle);
-					targetBundles.sourceBundles.put(artifact, sourceBundle);
+					targetBundles.addBundle(sourceArtifact, sourceBundle);
+					targetBundles.addSourceBundle(artifact, sourceBundle);
 				} catch (Exception e) {
 					// Source not available / usable
 				}
@@ -387,8 +376,22 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		} else {
 			failedArtifacts.add(artifact);
 			// failed ones must be added to the target as well to fail resolution of the TP
-			targetBundles.bundles.put(artifact, bundle);
+			targetBundles.addBundle(artifact, bundle);
 		}
+	}
+
+	/**
+	 * Internal method that lookup the instructions in the map with a fallback to
+	 * the default specified instructions of the location.
+	 */
+	BNDInstructions getInstructionsForArtifact(Artifact artifact) {
+		BNDInstructions bndInstructions = instructionsMap.get(getKey(artifact));
+		if (bndInstructions == null) {
+			// no specific instructions for this artifact, try using the location default
+			// then
+			bndInstructions = instructionsMap.get("");
+		}
+		return bndInstructions;
 	}
 
 	public MavenTargetLocation update(IProgressMonitor monitor) throws CoreException {
@@ -396,33 +399,9 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		List<MavenTargetDependency> latest = new ArrayList<>();
 		int updated = 0;
 		for (MavenTargetDependency dependency : roots) {
-			Artifact artifact = new DefaultArtifact(
-					dependency.getGroupId() + ":" + dependency.getArtifactId() + ":(0,]");
-			IMaven maven = MavenPlugin.getMaven();
-			RepositorySystem repoSystem = MavenPluginActivator.getDefault().getRepositorySystem();
-			IMavenExecutionContext context = maven.createExecutionContext();
-			List<ArtifactRepository> repositories = getAvailableArtifactRepositories(maven);
-			List<RemoteRepository> remoteRepositories = RepositoryUtils.toRepos(repositories);
-			VersionRangeRequest request = new VersionRangeRequest(artifact, remoteRepositories, null);
-			VersionRangeResult result = context.execute(new ICallable<VersionRangeResult>() {
-
-				@Override
-				public VersionRangeResult call(IMavenExecutionContext context, IProgressMonitor monitor)
-						throws CoreException {
-					RepositorySystemSession session = context.getRepositorySession();
-					try {
-						return repoSystem.resolveVersionRange(session, request);
-					} catch (VersionRangeResolutionException e) {
-						throw new CoreException(Status.error("Resolving latest version failed", e));
-					}
-				}
-			}, monitor);
-			Version highestVersion = result.getHighestVersion();
-			if (highestVersion == null || highestVersion.toString().equals(dependency.getVersion())) {
-				latest.add(dependency.copy());
-			} else {
-				latest.add(new MavenTargetDependency(dependency.getGroupId(), dependency.getArtifactId(),
-						highestVersion.toString(), dependency.getType(), dependency.getClassifier()));
+			MavenTargetDependency result = update(dependency, monitor);
+			latest.add(result);
+			if (!dependency.matches(result)) {
 				updated++;
 			}
 		}
@@ -431,12 +410,39 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		}
 
 		return new MavenTargetLocation(label, latest, extraRepositories, metadataMode, dependencyDepth,
-				dependencyScopes,
-				includeSource, instructionsMap.values(), excludedArtifacts, featureTemplate);
-
+				dependencyScopes, includeSource, instructionsMap.values(), excludedArtifacts, featureTemplate);
 	}
 
-	private List<ArtifactRepository> getAvailableArtifactRepositories(IMaven maven) throws CoreException {
+	public MavenTargetDependency update(MavenTargetDependency source, IProgressMonitor monitor) throws CoreException {
+		Artifact artifact = new DefaultArtifact(source.getGroupId() + ":" + source.getArtifactId() + ":(0,]");
+		IMaven maven = MavenPlugin.getMaven();
+		RepositorySystem repoSystem = MavenPluginActivator.getDefault().getRepositorySystem();
+		IMavenExecutionContext context = maven.createExecutionContext();
+		List<ArtifactRepository> repositories = getAvailableArtifactRepositories(maven);
+		List<RemoteRepository> remoteRepositories = RepositoryUtils.toRepos(repositories);
+		VersionRangeRequest request = new VersionRangeRequest(artifact, remoteRepositories, null);
+		VersionRangeResult result = context.execute(new ICallable<VersionRangeResult>() {
+			@Override
+			public VersionRangeResult call(IMavenExecutionContext context, IProgressMonitor monitor)
+					throws CoreException {
+				RepositorySystemSession session = context.getRepositorySession();
+				try {
+					return repoSystem.resolveVersionRange(session, request);
+				} catch (VersionRangeResolutionException e) {
+					throw new CoreException(Status.error("Resolving latest version failed", e));
+				}
+			}
+		}, monitor);
+		Version highestVersion = result.getHighestVersion();
+		if (highestVersion == null || highestVersion.toString().equals(source.getVersion())) {
+			return source.copy();
+		} else {
+			return new MavenTargetDependency(source.getGroupId(), source.getArtifactId(), highestVersion.toString(),
+					source.getType(), source.getClassifier());
+		}
+	}
+
+	List<ArtifactRepository> getAvailableArtifactRepositories(IMaven maven) throws CoreException {
 		List<ArtifactRepository> repositories = new ArrayList<>(maven.getArtifactRepositories());
 		for (MavenTargetRepository repo : extraRepositories) {
 			ArtifactRepository repository = maven.createArtifactRepository(repo.getId(), repo.getUrl());
@@ -471,15 +477,14 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		if (classifier != null && !classifier.isBlank()) {
 			key += ":" + classifier;
 		}
-		key += ":" + artifact.getBaseVersion();
-		return key;
+		return key + ":" + artifact.getBaseVersion();
 	}
 
-	public int getDependencyCount() {
-		if (targetBundles == null) {
-			return -1;
+	private static String getKeyWithoutClassifier(Artifact artifact) {
+		if (artifact == null) {
+			return "";
 		}
-		return targetBundles.bundles.size() - 1;
+		return artifact.getGroupId() + ":" + artifact.getArtifactId() + ":" + artifact.getBaseVersion();
 	}
 
 	List<DependencyNode> getDependencyNodes(MavenTargetDependency dependency) {
@@ -517,14 +522,9 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		if (this == obj) {
 			return true;
 		}
-		if (obj == null) {
-			return false;
-		}
-		if (getClass() != obj.getClass()) {
-			return false;
-		}
-		MavenTargetLocation other = (MavenTargetLocation) obj;
-		return Objects.equals(roots, other.roots) && Objects.equals(dependencyScopes, other.dependencyScopes)
+		return obj instanceof MavenTargetLocation other //
+				&& Objects.equals(roots, other.roots)//
+				&& Objects.equals(dependencyScopes, other.dependencyScopes)
 				&& Objects.equals(failedArtifacts, other.failedArtifacts);
 	}
 
@@ -546,12 +546,11 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		if (featureTemplate != null) {
 			try (PrintWriter writer = new PrintWriter(new StringBuilderWriter(xml))) {
 				featureTemplate.write("", writer);
-				writer.flush();
 			}
 		}
 		if (!roots.isEmpty()) {
 			xml.append("<" + ELEMENT_DEPENDENCIES + ">");
-			roots.stream().sorted(Comparator.comparing(MavenTargetDependency::getKey)).forEach(dependency -> {
+			roots.stream().sorted(Comparator.comparing(MavenTargetDependency::getKey)).forEachOrdered(dependency -> {
 				xml.append("<" + ELEMENT_DEPENDENCY + ">");
 				element(xml, ELEMENT_GROUP_ID, dependency.getGroupId());
 				element(xml, ELEMENT_ARTIFACT_ID, dependency.getArtifactId());
@@ -565,7 +564,7 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		if (!extraRepositories.isEmpty()) {
 			xml.append("<" + ELEMENT_REPOSITORIES + ">");
 			extraRepositories.stream().sorted(Comparator.comparing(MavenTargetRepository::getUrl))
-					.forEach(repository -> {
+					.forEachOrdered(repository -> {
 						xml.append("<" + ELEMENT_REPOSITORY + ">");
 						element(xml, ELEMENT_REPOSITORY_ID, repository.getId());
 						element(xml, ELEMENT_REPOSITORY_URL, repository.getUrl());
@@ -574,42 +573,29 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 			xml.append("</" + ELEMENT_REPOSITORIES + ">");
 		}
 		instructionsMap.values().stream().filter(Predicate.not(BNDInstructions::isEmpty))
-				.sorted(Comparator.comparing(BNDInstructions::getKey)).forEach(bnd -> {
-					String instructions = bnd.getInstructions();
+				.sorted(Comparator.comparing(BNDInstructions::key)).forEachOrdered(bnd -> {
 					xml.append("<" + ELEMENT_INSTRUCTIONS);
-					attribute(xml, ATTRIBUTE_INSTRUCTIONS_REFERENCE, bnd.getKey());
+					attribute(xml, ATTRIBUTE_INSTRUCTIONS_REFERENCE, bnd.key());
 					xml.append("><![CDATA[\r\n");
-					xml.append(instructions);
+					xml.append(bnd.instructions());
 					xml.append("\r\n]]></" + ELEMENT_INSTRUCTIONS + ">");
 				});
-		excludedArtifacts.stream().sorted().forEach(ignored -> {
-			element(xml, ELEMENT_EXCLUDED, ignored);
-		});
+		excludedArtifacts.stream().sorted().forEachOrdered(ignored -> element(xml, ELEMENT_EXCLUDED, ignored));
 		xml.append("</location>");
-		String string = xml.toString();
-		return string;
+		return xml.toString();
 	}
 
 	private static void element(StringBuilder xml, String name, String value) {
 		if (value != null && !value.isBlank()) {
-			xml.append('<');
-			xml.append(name);
-			xml.append('>');
+			xml.append('<').append(name).append('>');
 			xml.append(value);
-			xml.append("</");
-			xml.append(name);
-			xml.append('>');
+			xml.append("</").append(name).append('>');
 		}
 	}
 
 	private static void attribute(StringBuilder xml, String name, String value) {
 		if (value != null && !value.isBlank()) {
-			xml.append(' ');
-			xml.append(name);
-			xml.append('=');
-			xml.append('"');
-			xml.append(value);
-			xml.append('"');
+			xml.append(' ').append(name).append('=').append('"').append(value).append('"');
 		}
 	}
 
@@ -626,10 +612,7 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 	}
 
 	public Collection<String> getDependencyScopes() {
-		if (dependencyScopes.isEmpty()) {
-			return DEFAULT_DEPENDENCY_SCOPES;
-		}
-		return dependencyScopes;
+		return dependencyScopes.isEmpty() ? DEFAULT_DEPENDENCY_SCOPES : dependencyScopes;
 	}
 
 	public DependencyDepth getDependencyDepth() {
@@ -638,10 +621,7 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 
 	public boolean isIgnored(Artifact artifact) {
 		TargetBundles bundles = targetBundles;
-		if (bundles == null) {
-			return false;
-		}
-		return bundles.ignoredArtifacts.contains(artifact);
+		return bundles != null && bundles.ignoredArtifacts.contains(artifact);
 	}
 
 	public boolean isFailed(Artifact artifact) {
@@ -649,7 +629,11 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 	}
 
 	public boolean isExcluded(Artifact artifact) {
-		return excludedArtifacts.contains(getKey(artifact));
+		if (artifact == null) {
+			return false;
+		}
+		return excludedArtifacts.contains(getKey(artifact))
+				|| (artifact.getClassifier() != null && excludedArtifacts.contains(getKeyWithoutClassifier(artifact)));
 	}
 
 	public void setExcluded(Artifact artifact, boolean disabled) {
@@ -676,8 +660,16 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 		return null;
 	}
 
+	public Artifact lookupArtifact(File file) {
+		TargetBundles bundles = targetBundles;
+		if (bundles != null) {
+			return bundles.getArtifact(file).orElse(null);
+		}
+		return null;
+	}
+
 	public Collection<String> getExcludes() {
-		return Collections.unmodifiableCollection(excludedArtifacts);
+		return Collections.unmodifiableSet(excludedArtifacts);
 	}
 
 	public Collection<BNDInstructions> getInstructions() {
@@ -685,16 +677,16 @@ public class MavenTargetLocation extends AbstractBundleContainer {
 	}
 
 	public MavenTargetLocation withInstructions(Collection<BNDInstructions> instructions) {
-		return new MavenTargetLocation(label, roots.stream().map(MavenTargetDependency::copy).collect(Collectors.toList()), extraRepositories, metadataMode, dependencyDepth, dependencyScopes,
-				includeSource, instructions, excludedArtifacts, featureTemplate);
+		return new MavenTargetLocation(label, roots.stream().map(MavenTargetDependency::copy).toList(),
+				extraRepositories, metadataMode, dependencyDepth, dependencyScopes, includeSource, instructions,
+				excludedArtifacts, featureTemplate);
 	}
 
 	public MavenTargetLocation withoutRoot(MavenTargetDependency toRemove) {
 		return new MavenTargetLocation(label,
 				roots.stream().filter(root -> root != toRemove).map(root -> root.copy()).collect(Collectors.toList()),
-				extraRepositories,
-				metadataMode, dependencyDepth, dependencyScopes, includeSource, instructionsMap.values(),
-				excludedArtifacts, featureTemplate);
+				extraRepositories, metadataMode, dependencyDepth, dependencyScopes, includeSource,
+				instructionsMap.values(), excludedArtifacts, featureTemplate);
 	}
 
 }

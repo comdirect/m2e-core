@@ -1,12 +1,14 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2022 Sonatype, Inc.
+ * Copyright (c) 2008, 2022 Sonatype, Inc. and others
  *
- * This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License 2.0
- * which accompanies this distribution, and is available at
- * https://www.eclipse.org/legal/epl-2.0/
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0.
  *
  * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *   Sonatype, Inc. - initial API and implementation
  *******************************************************************************/
 package org.eclipse.m2e.pde.connector;
 
@@ -45,6 +47,7 @@ import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.embedder.ArtifactKey;
 import org.eclipse.m2e.core.embedder.IMaven;
 import org.eclipse.m2e.core.internal.IMavenConstants;
+import org.eclipse.m2e.core.internal.MavenArtifactIdentifier;
 import org.eclipse.m2e.core.internal.markers.IMavenMarkerManager;
 import org.eclipse.m2e.core.internal.markers.MavenProblemInfo;
 import org.eclipse.m2e.core.internal.markers.SourceLocation;
@@ -61,7 +64,6 @@ import org.eclipse.m2e.core.project.configurator.ProjectConfigurationRequest;
 import org.eclipse.m2e.jdt.IClasspathDescriptor;
 import org.eclipse.m2e.jdt.IClasspathManager;
 import org.eclipse.m2e.jdt.IJavaProjectConfigurator;
-import org.eclipse.m2e.sourcelookup.internal.MavenArtifactIdentifier;
 import org.eclipse.osgi.util.ManifestElement;
 import org.eclipse.pde.internal.core.project.PDEProject;
 import org.osgi.framework.BundleException;

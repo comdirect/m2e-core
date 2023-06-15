@@ -103,6 +103,8 @@ public class MavenProjectFacade implements IMavenProjectFacade, Serializable {
 
   private final List<IPath> testCompileSourceLocations;
 
+  private IPath buildOutputLocation;
+
   private final IPath outputLocation;
 
   private final IPath testOutputLocation;
@@ -134,12 +136,11 @@ public class MavenProjectFacade implements IMavenProjectFacade, Serializable {
     //TODO we currently always use the computed directory here 
     // but https://github.com/eclipse-m2e/m2e-core/issues/904 will add support for a user to specify a custom root directory
     // and then we should really inherit this from the configuration!
-    this.resolverConfiguration = new MavenProjectConfiguration(resolverConfiguration,
-        PlexusContainerManager.computeMultiModuleProjectDirectory(pomFile));
+    this.resolverConfiguration = new MavenProjectConfiguration(resolverConfiguration);
 
     this.artifactKey = new ArtifactKey(mavenProject.getArtifact());
     this.packaging = mavenProject.getPackaging();
-    this.modules = mavenProject.getModules();
+    this.modules = List.copyOf(mavenProject.getModules());
 
     this.resourceLocations = MavenProjectUtils.getResourceLocations(getProject(), mavenProject.getResources());
     this.testResourceLocations = MavenProjectUtils.getResourceLocations(getProject(), mavenProject.getTestResources());
@@ -152,6 +153,8 @@ public class MavenProjectFacade implements IMavenProjectFacade, Serializable {
 
     IPath path = getProjectRelativePath(mavenProject.getBuild().getOutputDirectory());
     this.outputLocation = (path != null) ? fullPath.append(path) : null;
+    path = getProjectRelativePath(mavenProject.getBuild().getDirectory());
+    this.buildOutputLocation = (path != null) ? fullPath.append(path) : null;
 
     path = getProjectRelativePath(mavenProject.getBuild().getTestOutputDirectory());
     this.testOutputLocation = path != null ? fullPath.append(path) : null;
@@ -189,7 +192,7 @@ public class MavenProjectFacade implements IMavenProjectFacade, Serializable {
 
     this.artifactKey = other.artifactKey;
     this.packaging = other.packaging;
-    this.modules = new ArrayList<>(other.modules);
+    this.modules = other.modules;
 
     this.resourceLocations = List.copyOf(other.resourceLocations);
     this.testResourceLocations = List.copyOf(other.testResourceLocations);
@@ -197,6 +200,7 @@ public class MavenProjectFacade implements IMavenProjectFacade, Serializable {
     this.testCompileSourceLocations = List.copyOf(other.testCompileSourceLocations);
 
     this.outputLocation = other.outputLocation;
+    this.buildOutputLocation = other.buildOutputLocation;
     this.testOutputLocation = other.testOutputLocation;
     this.finalName = other.finalName;
 
@@ -242,6 +246,11 @@ public class MavenProjectFacade implements IMavenProjectFacade, Serializable {
   @Override
   public IPath getProjectRelativePath(String resourceLocation) {
     return MavenProjectUtils.getProjectRelativePath(getProject(), resourceLocation);
+  }
+
+  @Override
+  public IPath getBuildOutputLocation() {
+    return buildOutputLocation;
   }
 
   /**
@@ -605,20 +614,30 @@ public class MavenProjectFacade implements IMavenProjectFacade, Serializable {
 
   @Override
   public IMavenExecutionContext createExecutionContext() {
+    File multiModuleProjectDirectory = getConfiguration().getMultiModuleProjectDirectory();
+    PlexusContainerManager containerManager = manager.getContainerManager();
+    IMavenPlexusContainer container;
     try {
-      File multiModuleProjectDirectory = getConfiguration().getMultiModuleProjectDirectory();
-      IMavenPlexusContainer container = manager.getContainerManager().aquire(multiModuleProjectDirectory);
-      MavenProject mavenProject = getMavenProject(null);
-      if(mavenProject == null) {
-        //could this actually happen or will a core exception be thrown instead? Should we still be able to create an execution? use always the cached variant here?
-        return new MavenExecutionContext(container.getComponentLookup(), getBaseDir(),
-            multiModuleProjectDirectory, null);
-      }
-      return new MavenExecutionContext(
-          PlexusContainerManager.wrap(container.getContainer(), mavenProject.getClassRealm()),
-          getBaseDir(), multiModuleProjectDirectory, ctx -> mavenProject);
+      container = containerManager.aquire(multiModuleProjectDirectory);
     } catch(Exception ex) {
-      throw new RuntimeException("Aquire container failed!", ex);
+      throw new RuntimeException("Acquire container failed!", ex);
+    }
+    MavenProject mavenProject = tryGetMavenProject();
+    if(mavenProject == null) {
+      return new MavenExecutionContext(container.getComponentLookup(), getBaseDir(), multiModuleProjectDirectory, null);
+    }
+    return new MavenExecutionContext(
+        PlexusContainerManager.wrap(container.getContainer(), mavenProject.getClassRealm()), getBaseDir(),
+        multiModuleProjectDirectory, ctx -> mavenProject);
+  }
+
+  private MavenProject tryGetMavenProject() {
+    try {
+      return manager.getMavenProject(this, null);
+    } catch(CoreException ex) {
+      //TODO can we handle this more graceful? E.g. one error condition is that project dependencies can not be resolved, maybe we can try to load the project without dependencies then?
+      manager.getMarkerManager().addErrorMarkers(pom, IMavenConstants.MARKER_POM_LOADING_ID, ex);
+      return null;
     }
   }
 
@@ -639,21 +658,35 @@ public class MavenProjectFacade implements IMavenProjectFacade, Serializable {
 
     private final String profiles;
 
-    public MavenProjectConfiguration(IProjectConfiguration baseConfiguration, File multiModuleProjectDirectory) {
+    private final Map<String, String> userProperties;
+
+    private List<String> activeProfiles;
+
+    private List<String> inactiveProfiles;
+
+    private MavenProjectConfiguration(IProjectConfiguration baseConfiguration) {
       if(baseConfiguration == null) {
         //we should really forbid this but some test seem to pass null!
         baseConfiguration = new ResolverConfiguration();
       }
-      this.multiModuleProjectDirectory = multiModuleProjectDirectory;
+      this.multiModuleProjectDirectory = baseConfiguration.getMultiModuleProjectDirectory();
       this.mappingId = baseConfiguration.getLifecycleMappingId();
       this.properties = Map.copyOf(baseConfiguration.getConfigurationProperties());
+      this.userProperties = Map.copyOf(baseConfiguration.getUserProperties());
       this.resolveWorkspace = baseConfiguration.isResolveWorkspaceProjects();
       this.profiles = baseConfiguration.getSelectedProfiles();
+      this.activeProfiles = List.copyOf(baseConfiguration.getActiveProfileList());
+      this.inactiveProfiles = List.copyOf(baseConfiguration.getInactiveProfileList());
     }
 
     @Override
     public Map<String, String> getConfigurationProperties() {
       return properties;
+    }
+
+    @Override
+    public Map<String, String> getUserProperties() {
+      return userProperties;
     }
 
     @Override
@@ -678,7 +711,7 @@ public class MavenProjectFacade implements IMavenProjectFacade, Serializable {
 
     @Override
     public int hashCode() {
-      return Objects.hash(mappingId, multiModuleProjectDirectory, profiles, properties, resolveWorkspace);
+      return IProjectConfiguration.contentsHashCode(this);
     }
 
     @Override
@@ -686,17 +719,20 @@ public class MavenProjectFacade implements IMavenProjectFacade, Serializable {
       if(this == obj) {
         return true;
       }
-      if(obj == null) {
-        return false;
+      if(obj instanceof IProjectConfiguration other) {
+        return IProjectConfiguration.contentsEquals(this, other);
       }
-      if(getClass() != obj.getClass()) {
-        return false;
-      }
-      MavenProjectConfiguration other = (MavenProjectConfiguration) obj;
-      return Objects.equals(this.mappingId, other.mappingId)
-          && Objects.equals(this.multiModuleProjectDirectory, other.multiModuleProjectDirectory)
-          && Objects.equals(this.profiles, other.profiles) && Objects.equals(this.properties, other.properties)
-          && this.resolveWorkspace == other.resolveWorkspace;
+      return false;
+    }
+
+    @Override
+    public List<String> getActiveProfileList() {
+      return activeProfiles;
+    }
+
+    @Override
+    public List<String> getInactiveProfileList() {
+      return inactiveProfiles;
     }
 
   }

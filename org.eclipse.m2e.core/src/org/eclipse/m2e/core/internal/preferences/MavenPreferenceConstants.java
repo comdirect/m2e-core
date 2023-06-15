@@ -36,7 +36,9 @@ public interface MavenPreferenceConstants {
   /** boolean */
   String P_OFFLINE = PREFIX + "offline"; //$NON-NLS-1$
 
-  /** boolean. if true, use org.eclipse.aether.repository.RepositoryPolicy.UPDATE_POLICY_NEVER as global update policy */
+  /**
+   * boolean. if true, use org.eclipse.aether.repository.RepositoryPolicy.UPDATE_POLICY_NEVER as global update policy
+   */
   String P_GLOBAL_UPDATE_NEVER = PREFIX + "globalUpdatePolicy"; //$NON-NLS-1$
 
   /** boolean */
@@ -90,9 +92,6 @@ public interface MavenPreferenceConstants {
 
   /** boolean */
   String P_FULL_INDEX = PREFIX + "fullIndex"; //$NON-NLS-1$
-
-  /** boolean **/
-  String P_WARN_INCOMPLETE_MAPPING = PREFIX + "warn_incomplete_mapping"; //$NON-NLS-1$
 
   /** boolean **/
   String P_DEFAULT_POM_EDITOR_PAGE = "eclipse.m2.defaultPomEditorPage"; //$NON-NLS-1$
@@ -149,6 +148,11 @@ public interface MavenPreferenceConstants {
    * @since 1.6
    **/
   String P_AUTO_UPDATE_CONFIGURATION = PREFIX + "autoUpdateProjects"; //$NON-NLS-1$
+
+  String P_DEFAULT_MOJO_EXECUTION_ACTION = PREFIX + "unkownMojoExecutionAction"; //$NON-NLS-1$
+
+  /** boolean */
+  String P_QUERY_CENTRAL_TO_IDENTIFY_ARTIFACT = PREFIX + "queryCentralToIdentifyArtifact"; //$NON-NLS-1$
 
   /**
    * boolean.

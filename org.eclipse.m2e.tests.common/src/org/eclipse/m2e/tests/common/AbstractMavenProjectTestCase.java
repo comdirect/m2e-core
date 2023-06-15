@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -33,6 +35,7 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -73,6 +76,7 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 
 import org.codehaus.plexus.PlexusContainer;
+import org.codehaus.plexus.component.composition.CycleDetectedInComponentGraphException;
 import org.codehaus.plexus.component.repository.ComponentDescriptor;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
@@ -89,6 +93,7 @@ import org.eclipse.m2e.core.internal.preferences.MavenConfigurationImpl;
 import org.eclipse.m2e.core.internal.project.ProjectConfigurationManager;
 import org.eclipse.m2e.core.internal.project.registry.MavenProjectFacade;
 import org.eclipse.m2e.core.internal.project.registry.ProjectRegistryRefreshJob;
+import org.eclipse.m2e.core.lifecyclemapping.model.PluginExecutionAction;
 import org.eclipse.m2e.core.project.IArchetype;
 import org.eclipse.m2e.core.project.IMavenProjectFacade;
 import org.eclipse.m2e.core.project.IMavenProjectImportResult;
@@ -234,8 +239,13 @@ public abstract class AbstractMavenProjectTestCase {
     LifecycleMappingFactory.setDefaultLifecycleMappingMetadataSource(null);
 
     WorkspaceHelpers.cleanWorkspace();
-    FilexWagon.setRequestFailPattern(null);
-    FilexWagon.setRequestFilterPattern(null, true);
+
+    // Create .mvn folder to prevent Maven launches in tests from using the .mvn folder of this git repo.
+    // Otherwise MavenLaunchDelegate.findMavenProjectBasedir() find this git repos .mvn folder and its content would interfer with the tests.
+    Files.createDirectories(Path.of(workspace.getRoot().getLocationURI()).resolve(".mvn"));
+
+    FilexWagon.reset();
+    HttxWagon.reset();
     driveEvents();
   }
 
@@ -259,6 +269,7 @@ public abstract class AbstractMavenProjectTestCase {
     setAutoBuilding(false);
     setAutomaticallyUpdateConfiguration(false);
     FilexWagon.reset();
+    HttxWagon.reset();
   }
 
   /**
@@ -600,6 +611,18 @@ public abstract class AbstractMavenProjectTestCase {
     copyContent(project, new FileInputStream(from), to, true);
   }
 
+  protected static <T> T withDefaultLifecycleMapping(PluginExecutionAction defaultAction, Callable<T> action)
+      throws Exception {
+    IMavenConfiguration configuration = MavenPlugin.getMavenConfiguration();
+    PluginExecutionAction oldvalue = configuration.getDefaultMojoExecutionAction();
+    try {
+      configuration.setDefaultMojoExecutionAction(defaultAction);
+      return action.call();
+    } finally {
+      configuration.setDefaultMojoExecutionAction(oldvalue);
+    }
+  }
+
   /**
    * closes contents stream
    */
@@ -662,15 +685,21 @@ public abstract class AbstractMavenProjectTestCase {
     return projects;
   }
 
-  protected void injectFilexWagon() throws Exception {
+  protected void injectRedirectingWagons() throws Exception {
+    injectWagon(FilexWagon.class, FilexWagon.PROTOCOL);
+    injectWagon(HttxWagon.class, HttxWagon.PROTOCOL);
+  }
+
+  private void injectWagon(Class<? extends Wagon> wagonClass, String wagonRoleHint)
+      throws CoreException, CycleDetectedInComponentGraphException {
     PlexusContainer container = MavenPlugin.getMaven().lookup(PlexusContainer.class);
-    if(container.getContainerRealm().getResource(FilexWagon.class.getName().replace('.', '/') + ".class") == null) {
-      container.getContainerRealm().importFrom(FilexWagon.class.getClassLoader(), FilexWagon.class.getName());
+    if(container.getContainerRealm().getResource(wagonClass.getName().replace('.', '/') + ".class") == null) {
+      container.getContainerRealm().importFrom(wagonClass.getClassLoader(), wagonClass.getName());
       ComponentDescriptor<Wagon> descriptor = new ComponentDescriptor<>();
       descriptor.setRealm(container.getContainerRealm());
       descriptor.setRoleClass(Wagon.class);
-      descriptor.setImplementationClass(FilexWagon.class);
-      descriptor.setRoleHint("filex");
+      descriptor.setImplementationClass(wagonClass);
+      descriptor.setRoleHint(wagonRoleHint);
       descriptor.setInstantiationStrategy("per-lookup");
       container.addComponentDescriptor(descriptor);
     }

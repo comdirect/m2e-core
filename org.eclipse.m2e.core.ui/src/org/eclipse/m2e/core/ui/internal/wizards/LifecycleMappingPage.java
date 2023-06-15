@@ -32,10 +32,8 @@ import org.slf4j.LoggerFactory;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.NullProgressMonitor;
-import org.eclipse.jface.dialogs.Dialog;
-import org.eclipse.jface.layout.GridDataFactory;
 import org.eclipse.jface.layout.TreeColumnLayout;
-import org.eclipse.jface.resource.JFaceResources;
+import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.viewers.CellEditor;
 import org.eclipse.jface.viewers.ColumnWeightData;
 import org.eclipse.jface.viewers.ComboBoxCellEditor;
@@ -52,16 +50,19 @@ import org.eclipse.jface.wizard.WizardPage;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CCombo;
+import org.eclipse.swt.events.ExpandEvent;
+import org.eclipse.swt.events.ExpandListener;
 import org.eclipse.swt.events.SelectionListener;
-import org.eclipse.swt.graphics.FontMetrics;
-import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.layout.BorderData;
+import org.eclipse.swt.layout.BorderLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
-import org.eclipse.swt.widgets.Group;
+import org.eclipse.swt.widgets.ExpandBar;
+import org.eclipse.swt.widgets.ExpandItem;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.Tree;
@@ -125,8 +126,6 @@ public class LifecycleMappingPage extends WizardPage {
 
   private final Set<ILifecycleMappingLabelProvider> ignoreWorkspace = new HashSet<>();
 
-  private Label errorCountLabel;
-
   /**
    * Create the wizard.
    */
@@ -135,6 +134,8 @@ public class LifecycleMappingPage extends WizardPage {
     setTitle(Messages.LifecycleMappingPage_title);
     setDescription(Messages.LifecycleMappingPage_description);
     setPageComplete(true); // always allow to leave mapping page, even when there are mapping problems
+    setImageDescriptor(ImageDescriptor
+        .createFromURL(LifecycleMappingPage.class.getResource("/icons/banner_lifecycleMappingPage.png")));
   }
 
   /**
@@ -145,12 +146,55 @@ public class LifecycleMappingPage extends WizardPage {
   @Override
   public void createControl(Composite parent) {
     Composite container = new Composite(parent, SWT.NULL);
-
     setControl(container);
-    container.setLayout(new GridLayout(1, false));
+    container.setLayout(new BorderLayout());
+    BorderData tableBorderData = new BorderData(SWT.CENTER);
+    tableBorderData.hHint = 300;
+    tableBorderData.wHint = 800;
+    createMappingTree(container).setLayoutData(tableBorderData);
+    createDescription(container).setLayoutData(new BorderData(SWT.BOTTOM));
+  }
+
+  private Control createDescription(Composite parent) {
+    ExpandBar bar = new ExpandBar(parent, SWT.NONE);
+    Composite container = new Composite(bar, SWT.NULL);
+    container.setLayout(new BorderLayout());
+    details = new Text(container, SWT.WRAP | SWT.READ_ONLY | SWT.V_SCROLL);
+    details.setLayoutData(new BorderData(SWT.CENTER));
+    Composite licenseContainer = new Composite(container, SWT.NULL);
+    new Label(licenseContainer, SWT.NONE).setText(Messages.LifecycleMappingPage_licenseLabel);
+    license = new Text(licenseContainer, SWT.READ_ONLY);
+    license.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+    licenseContainer.setLayout(new GridLayout(2, false));
+    licenseContainer.setLayoutData(new BorderData(SWT.BOTTOM));
+
+    ExpandItem expandItem = new ExpandItem(bar, SWT.NONE, 0);
+    expandItem.setText(Messages.LifecycleMappingPage_descriptionLabel);
+    expandItem.setHeight(120);
+    expandItem.setControl(container);
+    expandItem.setExpanded(true);
+    //Workaround for https://github.com/eclipse-platform/eclipse.platform.swt/issues/551 
+    bar.addExpandListener(new ExpandListener() {
+
+      @Override
+      public void itemExpanded(ExpandEvent e) {
+        itemCollapsed(e);
+      }
+
+      @Override
+      public void itemCollapsed(ExpandEvent e) {
+        bar.requestLayout();
+      }
+    });
+    return bar;
+  }
+
+  private Composite createMappingTree(Composite parent) {
+    Composite container = new Composite(parent, SWT.NULL);
+    container.setLayout(new BorderLayout());
 
     Composite treeViewerContainer = new Composite(container, SWT.NULL);
-    GridDataFactory.fillDefaults().grab(true, false).applyTo(treeViewerContainer);
+    treeViewerContainer.setLayoutData(new BorderData(SWT.CENTER));
     TreeColumnLayout treeColumnLayout = new TreeColumnLayout();
     treeViewerContainer.setLayout(treeColumnLayout);
 
@@ -209,7 +253,6 @@ public class LifecycleMappingPage extends WizardPage {
             }
           }
           getViewer().refresh(true);
-          updateErrorCount();
           getContainer().updateButtons();
         }
       }
@@ -241,7 +284,7 @@ public class LifecycleMappingPage extends WizardPage {
           for(IMavenDiscoveryProposal prop : all) {
             values.add(NLS.bind(Messages.LifecycleMappingPage_installDescription, prop.toString()));
           }
-          values.add(Messages.LifecycleMappingPage_resolveLaterDescription);
+          values.add(Messages.LifecycleMappingPage_useDefaultMapping);
 
           addIgnoreProposals(values, prov);
           ComboBoxCellEditor edit = new ComboBoxCellEditor(treeViewer.getTree(),
@@ -390,12 +433,7 @@ public class LifecycleMappingPage extends WizardPage {
       public String getColumnText(Object element, int columnIndex) {
         if(element instanceof ILifecycleMappingLabelProvider prov) {
           if(columnIndex == MAVEN_INFO_IDX) {
-            String text = prov.getMavenText();
-            if(prov instanceof AggregateMappingLabelProvider aggProv && !isHandled(prov)) {
-              text = NLS.bind(Messages.LifecycleMappingPage_errorMavenBuild,
-                  new String[] {text, String.valueOf(aggProv.getChildren().length)});
-            }
-            return text;
+            return prov.getMavenText();
           } else if(columnIndex == ACTION_INFO_IDX && element instanceof AggregateMappingLabelProvider) {
             IMavenDiscoveryProposal proposal = mappingConfiguration.getSelectedProposal(prov.getKey());
             if(ignore.contains(element)) {
@@ -409,7 +447,7 @@ public class LifecycleMappingPage extends WizardPage {
             } else if(loading || !prov.isError(mappingConfiguration)) {
               return EMPTY_STRING;
             } else {
-              return Messages.LifecycleMappingPage_resolveLaterDescription;
+              return Messages.LifecycleMappingPage_useDefaultMapping;
             }
           }
         }
@@ -423,7 +461,10 @@ public class LifecycleMappingPage extends WizardPage {
         }
         if(element instanceof AggregateMappingLabelProvider prov) {
           if(prov.isError(mappingConfiguration) && !isHandled(prov)) {
-            return MavenImages.IMG_ERROR;
+            //historically missing mappings where shows as ERROR (therefore the name isError)
+            //but now m2e execute missing mappings according on user request so this is more an info that
+            //it is handled automatic and the user can choose to change this
+            return MavenImages.IMG_INFO_AUTO;
           }
           return MavenImages.IMG_PASSED;
         }
@@ -468,14 +509,11 @@ public class LifecycleMappingPage extends WizardPage {
       }
     });
 
-    Composite composite = new Composite(container, SWT.NONE);
-    composite.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
-    composite.setLayout(new GridLayout(3, false));
-
-    errorCountLabel = new Label(composite, SWT.NONE);
-    errorCountLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
-
-    Button btnNewButton_1 = new Button(composite, SWT.NONE);
+    Composite buttons = new Composite(container, SWT.NONE);
+    buttons.setLayoutData(new BorderData(SWT.BOTTOM));
+    buttons.setLayout(new GridLayout(3, false));
+    new Label(buttons, SWT.NONE).setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+    Button btnNewButton_1 = new Button(buttons, SWT.NONE);
     btnNewButton_1.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
       mappingConfiguration.clearSelectedProposals();
       ignore.clear();
@@ -483,11 +521,10 @@ public class LifecycleMappingPage extends WizardPage {
       ignoreWorkspace.clear();
       treeViewer.refresh();
       getWizard().getContainer().updateButtons(); // needed to enable/disable Finish button
-      updateErrorCount();
     }));
     btnNewButton_1.setText(Messages.LifecycleMappingPage_deselectAllButton);
 
-    autoSelectButton = new Button(composite, SWT.NONE);
+    autoSelectButton = new Button(buttons, SWT.NONE);
     autoSelectButton.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
       resetDetails();
       ignore.clear();
@@ -496,34 +533,7 @@ public class LifecycleMappingPage extends WizardPage {
       discoverProposals();
     }));
     autoSelectButton.setText(Messages.LifecycleMappingPage_autoSelectButton);
-
-    // Provide a reasonable height for the details box
-    GC gc = new GC(container);
-    gc.setFont(JFaceResources.getDialogFont());
-    FontMetrics fontMetrics = gc.getFontMetrics();
-    gc.dispose();
-
-    Group grpDetails = new Group(container, SWT.NONE);
-    grpDetails.setLayout(new GridLayout(1, false));
-    grpDetails.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 1, 1));
-    grpDetails.setText(Messages.LifecycleMappingPage_descriptionLabel);
-
-    details = new Text(grpDetails, SWT.WRAP | SWT.READ_ONLY | SWT.V_SCROLL);
-    GridData gd = new GridData(SWT.FILL, SWT.FILL, true, true);
-    gd.heightHint = Dialog.convertHeightInCharsToPixels(fontMetrics, 3);
-    gd.minimumHeight = Dialog.convertHeightInCharsToPixels(fontMetrics, 1);
-    details.setLayoutData(gd);
-
-    Group grpLicense = new Group(container, SWT.NONE);
-    grpLicense.setLayout(new GridLayout(1, false));
-    grpLicense.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 1, 1));
-    grpLicense.setText(Messages.LifecycleMappingPage_licenseLabel);
-
-    license = new Text(grpLicense, SWT.READ_ONLY);
-    gd = new GridData(SWT.FILL, SWT.FILL, true, true);
-    gd.heightHint = Dialog.convertHeightInCharsToPixels(fontMetrics, 1);
-    gd.minimumHeight = Dialog.convertHeightInCharsToPixels(fontMetrics, 1);
-    license.setLayoutData(gd);
+    return container;
   }
 
   /**
@@ -561,7 +571,6 @@ public class LifecycleMappingPage extends WizardPage {
     loading = false;
     treeViewer.refresh();
     getWizard().getContainer().updateButtons(); // needed to enable/disable Finish button
-    updateErrorCount();
   }
 
   @Override
@@ -576,7 +585,6 @@ public class LifecycleMappingPage extends WizardPage {
         mappingConfiguration.autoCompleteMapping();
       }
       treeViewer.setInput(mappingConfiguration);
-      updateErrorCount();
     }
   }
 
@@ -634,24 +642,6 @@ public class LifecycleMappingPage extends WizardPage {
    */
   public Collection<ILifecycleMappingLabelProvider> getIgnoreWorkspace() {
     return ignoreWorkspace;
-  }
-
-  /*
-   * Update the error summary
-   */
-  private void updateErrorCount() {
-    int count = 0;
-    for(TreeItem item : treeViewer.getTree().getItems()) {
-      ILifecycleMappingLabelProvider prov = (ILifecycleMappingLabelProvider) item.getData();
-      if(!isHandled(prov)) {
-        if(prov instanceof AggregateMappingLabelProvider aggProv) {
-          count += aggProv.getChildren().length;
-        } else {
-          ++count;
-        }
-      }
-    }
-    errorCountLabel.setText(NLS.bind(Messages.LifecycleMappingPage_numErrors, String.valueOf(count)));
   }
 
   /*

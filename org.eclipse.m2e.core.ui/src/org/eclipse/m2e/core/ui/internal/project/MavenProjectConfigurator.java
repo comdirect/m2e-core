@@ -35,6 +35,9 @@ import org.eclipse.ui.wizards.datatransfer.ProjectConfigurator;
 
 import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.internal.IMavenConstants;
+import org.eclipse.m2e.core.internal.jobs.MavenJob;
+import org.eclipse.m2e.core.internal.lifecyclemapping.discovery.ILifecycleMappingRequirement;
+import org.eclipse.m2e.core.internal.lifecyclemapping.discovery.IMavenDiscoveryProposal;
 import org.eclipse.m2e.core.internal.lifecyclemapping.discovery.LifecycleMappingDiscoveryRequest;
 import org.eclipse.m2e.core.internal.project.ProjectConfigurationManager;
 import org.eclipse.m2e.core.project.LocalProjectScanner;
@@ -62,7 +65,7 @@ public class MavenProjectConfigurator implements ProjectConfigurator {
         }
 
         private CumulativeMappingDiscoveryJob() {
-            super(Collections.<IProject>emptyList());
+          super(Collections.<IProject> emptyList(), true);
             this.toProcess = Collections.synchronizedSet(new HashSet<IProject>());
         }
 
@@ -88,6 +91,12 @@ public class MavenProjectConfigurator implements ProjectConfigurator {
                 }
                 // Some errors were detected
                 discoverProposals(discoveryRequest, monitor);
+                Map<ILifecycleMappingRequirement, List<IMavenDiscoveryProposal>> proposals = discoveryRequest
+                    .getAllProposals();
+                if(proposals.isEmpty()) {
+                  //if we can't propose anything to the user there is actually no point in open the dialog.
+                  return Status.OK_STATUS;
+                }
                 openProposalWizard(toProcess, discoveryRequest);
             } finally {
                 this.toProcess.clear();
@@ -117,7 +126,7 @@ public class MavenProjectConfigurator implements ProjectConfigurator {
      *
      */
     @SuppressWarnings("restriction")
-    public static class UpdateMavenConfigurationJob extends Job
+    public static class UpdateMavenConfigurationJob extends MavenJob
         implements org.eclipse.m2e.core.internal.jobs.IBackgroundProcessingQueue {
 
         private static UpdateMavenConfigurationJob INSTANCE;

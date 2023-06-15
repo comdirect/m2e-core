@@ -9,7 +9,7 @@ pipeline {
 		label "centos-latest"
 	}
 	tools {
-		maven 'apache-maven-3.8.6'
+		maven 'apache-maven-3.9.1'
 		jdk 'openjdk-jdk17-latest'
 	}
 	stages {
@@ -19,13 +19,19 @@ pipeline {
 			}
 		}
 		stage('initialize PGP') {
+			when {
+				anyOf{
+					branch 'master';
+					branch pattern: 'm2e-[0-9]+\\.[0-9]+\\.x', comparator: "REGEXP"
+				}
+			}
 			steps {
 				withCredentials([file(credentialsId: 'secret-subkeys.asc', variable: 'KEYRING')]) {
 					sh 'gpg --batch --import "${KEYRING}"'
 					sh '''
 						for fpr in $(gpg --list-keys --with-colons | awk -F: \'/fpr:/ {print $10}\' | sort -u)
 						do
-							echo -e "5\ny\n" | gpg --batch --command-fd 0 --expert --edit-key ${fpr} trust 
+							echo -e "5\ny\n" | gpg --batch --command-fd 0 --expert --edit-key ${fpr} trust
 						done
 					'''
 				}
@@ -34,10 +40,17 @@ pipeline {
 		stage('Build') {
 			steps {
 				withCredentials([string(credentialsId: 'gpg-passphrase', variable: 'KEYRING_PASSPHRASE')]) {
-				wrap([$class: 'Xvnc', useXauthority: true]) {
-					sh 'mvn clean verify -B -V \
-						-Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true \
-						-Peclipse-sign,its -Dgpg.passphrase="${KEYRING_PASSPHRASE}" -Dgpg.keyname="011C526F29B2CE79"'
+				xvnc(useXauthority: true) {
+					sh '''
+						mavenArgs="clean verify -Dtycho.p2.baselineMode=failCommon --batch-mode"
+						if [[ ${BRANCH_NAME} == master ]] || [[ ${BRANCH_NAME} =~ m2e-[0-9]+\\.[0-9]+\\.x ]]; then
+							mvn ${mavenArgs} -Peclipse-sign,its -Dgpg.passphrase="${KEYRING_PASSPHRASE}" -Dgpg.keyname="011C526F29B2CE79"
+						else
+							# Clear KEYRING_PASSPHRASE environment variable
+							export KEYRING_PASSPHRASE='EMPTY'
+							mvn ${mavenArgs} -Pits
+						fi
+					'''
 				}}
 			}
 			post {
@@ -69,7 +82,7 @@ pipeline {
 						}
 						# Read M2E branding version
 						version=$(xmllint --xpath 'string(/feature/@version)' org.eclipse.m2e.sdk.feature/feature.xml)
-						if [[ $version =~ ([0-9]\\.[0-9]\\.[0-9])\\.qualifier ]] # backslash itself has to be escaped in Jenkinsfile
+						if [[ $version =~ ([0-9]+\\.[0-9]+\\.[0-9]+)\\.qualifier ]] # backslash itself has to be escaped in Jenkinsfile
 						then
 							M2E_VERSION="${BASH_REMATCH[1]}"
 						else

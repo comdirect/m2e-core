@@ -21,10 +21,12 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import org.eclipse.core.runtime.CoreException;
@@ -138,10 +140,14 @@ public interface IMavenToolbox {
    * 
    * @param project
    */
-  default void clearProjectBuildingRequest(MavenProject project) {
-    if(project != null) {
+  private static void clearProjectBuildingRequest(MavenProject project) {
+    clearProjectBuildingRequest(project, Collections.newSetFromMap(new IdentityHashMap<>()));
+  }
+
+  private static void clearProjectBuildingRequest(MavenProject project, Set<MavenProject> seen) {
+    if(project != null && seen.add(project)) {
       project.setProjectBuildingRequest(null);
-      clearProjectBuildingRequest(project.getParent());
+      clearProjectBuildingRequest(project.getParent(), seen);
     }
   }
 

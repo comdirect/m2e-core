@@ -1,3 +1,15 @@
+/*******************************************************************************
+ * Copyright (c) 2020, 2023 Christoph Läubrich and others
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0.
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *   Christoph Läubrich - initial API and implementation
+ *******************************************************************************/
 package org.eclipse.m2e.pde.ui.target.editor;
 
 import org.eclipse.osgi.util.NLS;
@@ -20,7 +32,16 @@ public class Messages extends NLS {
 	public static String MavenTargetDependencyEditor_3;
 	public static String MavenTargetDependencyEditor_4;
 	public static String MavenTargetDependencyEditor_5;
-	public static String MavenTargetDependencyEditor_6;
+	public static String MavenTargetDependencyEditor_7;
+	public static String MavenTargetDependencyEditor_8;
+	public static String MavenTargetDependencyEditor_9;
+	public static String MavenTargetDependencyEditor_10;
+	public static String MavenTargetDependencyEditor_11;
+	public static String MavenTargetDependencyEditor_12;
+	public static String MavenTargetDependencyEditor_13;
+	public static String MavenTargetDependencyEditor_14;
+	public static String MavenTargetDependencyEditor_15;
+	public static String MavenTargetDependencyEditor_16;
 	public static String MavenTargetLocationWizard_8;
 	public static String MavenTargetLocationWizard_9;
 	public static String MavenTargetLocationWizard_10;

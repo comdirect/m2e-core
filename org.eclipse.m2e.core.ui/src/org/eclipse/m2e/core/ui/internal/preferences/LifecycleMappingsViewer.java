@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.osgi.framework.Bundle;
 
@@ -64,6 +65,7 @@ import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.project.MavenProject;
 
 import org.eclipse.m2e.core.MavenPlugin;
+import org.eclipse.m2e.core.internal.lifecyclemapping.DefaultPluginExecutionMetadata;
 import org.eclipse.m2e.core.internal.lifecyclemapping.LifecycleMappingFactory;
 import org.eclipse.m2e.core.internal.lifecyclemapping.LifecycleMappingResult;
 import org.eclipse.m2e.core.internal.lifecyclemapping.model.LifecycleMappingMetadata;
@@ -428,30 +430,21 @@ public class LifecycleMappingsViewer {
   }
 
   String toString(MojoExecutionKey execution, List<IPluginExecutionMetadata> mappings) {
-    StringBuilder sb = new StringBuilder();
     if(mappings != null && !mappings.isEmpty()) {
-      for(IPluginExecutionMetadata mapping : mappings) {
-        if(sb.length() > 0) {
-          sb.append(',');
-        }
-        sb.append(mapping.getAction().toString());
-      }
-    } else {
-      if(LifecycleMappingFactory.isInterestingPhase(execution.lifecyclePhase())) {
-        sb.append(PluginExecutionAction.error.toString());
-      } else {
-        sb.append(PluginExecutionAction.ignore.toString());
-      }
+      return mappings.stream().map(IPluginExecutionMetadata::getAction).map(PluginExecutionAction::toString).distinct()
+          .collect(Collectors.joining(", ")); //$NON-NLS-1$
     }
-    return sb.toString();
+    if(LifecycleMappingFactory.isInterestingPhase(execution.lifecyclePhase())) {
+      return PluginExecutionAction.error.toString();
+    }
+    return PluginExecutionAction.ignore.toString();
   }
 
   String getSourcelabel(MojoExecutionKey execution, List<IPluginExecutionMetadata> mappings, boolean detailed) {
     LinkedHashSet<String> sources = new LinkedHashSet<>();
     if(mappings != null && !mappings.isEmpty()) {
       for(IPluginExecutionMetadata mapping : mappings) {
-        LifecycleMappingMetadataSource metadata = ((PluginExecutionMetadata) mapping).getSource();
-        if(metadata != null) {
+        if(mapping instanceof LifecycleMappingMetadataSource metadata) {
           Object source = metadata.getSource();
           if(source instanceof String s) {
             sources.add(s);
@@ -464,6 +457,10 @@ public class LifecycleMappingsViewer {
           } else {
             sources.add("unknown"); //$NON-NLS-1$
           }
+        } else if(mapping instanceof DefaultPluginExecutionMetadata) {
+          sources.add("default"); //$NON-NLS-1$
+        } else {
+          sources.add("unknown"); //$NON-NLS-1$
         }
       }
     } else {
@@ -471,14 +468,7 @@ public class LifecycleMappingsViewer {
         sources.add("uninteresting"); //$NON-NLS-1$
       }
     }
-    StringBuilder sb = new StringBuilder();
-    for(String source : sources) {
-      if(sb.length() > 0) {
-        sb.append(',');
-      }
-      sb.append(source);
-    }
-    return sb.toString();
+    return String.join(", ", sources);
   }
 
   private String getSourceLabel(Bundle bundle, boolean detailed) {

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014 Igor Fedorenko
+ * Copyright (c) 2014-2023 Igor Fedorenko
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -13,13 +13,11 @@
 package org.eclipse.m2e.sourcelookup.ui.internal;
 
 import org.eclipse.jface.layout.GridDataFactory;
+import org.eclipse.jface.layout.GridLayoutFactory;
 import org.eclipse.jface.preference.PreferencePage;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
-import org.eclipse.swt.events.ControlAdapter;
-import org.eclipse.swt.events.ControlEvent;
-import org.eclipse.swt.layout.GridData;
-import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.events.ControlListener;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Label;
@@ -27,78 +25,72 @@ import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPreferencePage;
 
-
 public class SourceLookupPreferencePage extends PreferencePage implements IWorkbenchPreferencePage {
-  private Text vmArguments;
 
-  private Text launchFileVMArguments;
+	public SourceLookupPreferencePage() {
+		setMessage("Manual configuration of dynamic source lookup");
+		noDefaultAndApplyButton();
+	}
 
-  private Text launchFileAttribute;
+	@Override
+	public void init(IWorkbench workbench) {
+	}
 
-  public SourceLookupPreferencePage() {
-    setMessage("Manual configuration of dynamic source lookup");
-    noDefaultAndApplyButton();
-  }
+	@Override
+	protected Control createContents(Composite parent) {
+		Composite composite = new Composite(parent, SWT.NONE);
 
-  @Override
-public void init(IWorkbench workbench) {}
+		disableScrollingFor(composite);
 
-  @Override
-  protected Control createContents(Composite parent) {
-	Composite composite = new Composite(parent, SWT.NONE);
+		GridLayoutFactory.swtDefaults().numColumns(1).equalWidth(false).margins(0, 0).applyTo(composite);
 
-    disableScrollingFor(composite);
+		createLabel("VM arguments:", composite);
 
-    GridLayout gl_composite = new GridLayout(1, false);
-    gl_composite.marginWidth = 0;
-    gl_composite.marginHeight = 0;
-    composite.setLayout(gl_composite);
+		GridDataFactory textGridDataFactory = GridDataFactory.swtDefaults().align(SWT.FILL, SWT.FILL).grab(true, false)
+				.span(1, 1).hint(parent.getSize().x, SWT.DEFAULT);
 
-    Label lblVMArguments = new Label(composite, SWT.NONE);
-    lblVMArguments.setText("VM arguments:");
+		@SuppressWarnings("restriction")
+		String javaagentString = org.eclipse.jdt.internal.launching.sourcelookup.advanced.AdvancedSourceLookupSupport
+				.getJavaagentString();
+		createTextField(javaagentString, composite, textGridDataFactory);
 
-    GridDataFactory textGridDataFactory = GridDataFactory.createFrom(new GridData(SWT.FILL, SWT.FILL, true, false, 1, 1)).hint(parent.getSize().x, SWT.DEFAULT);
+		createLabel(".launch file VM arguments:", composite);
 
-    vmArguments = new Text(composite, SWT.BORDER | SWT.READ_ONLY | SWT.WRAP | SWT.MULTI);
-	textGridDataFactory.applyTo(vmArguments);
-	@SuppressWarnings("restriction")
-	String javaagentString = org.eclipse.jdt.internal.launching.sourcelookup.advanced.AdvancedSourceLookupSupport.getJavaagentString();
-	vmArguments.setText(javaagentString);
+		createTextField("-javaagent:${sourcelookup_agent_path}", composite, textGridDataFactory);
 
-    Label lblLaunchVMArguments = new Label(composite, SWT.NONE);
-    lblLaunchVMArguments.setText(".launch file VM arguments:");
+		createLabel(".launch file attribute:", composite);
 
-    launchFileVMArguments = new Text(composite, SWT.BORDER | SWT.READ_ONLY | SWT.WRAP | SWT.MULTI);
-    textGridDataFactory.applyTo(launchFileVMArguments);
-    launchFileVMArguments.setText("-javaagent:${sourcelookup_agent_path}");
+		createTextField(
+				"<stringAttribute key=\"org.eclipse.debug.core.source_locator_id\" value=\"org.eclipse.m2e.sourcelookupDirector\"/>\n",
+				composite, textGridDataFactory);
 
-    Label lblLaunchFileAttribute = new Label(composite, SWT.NONE);
-    lblLaunchFileAttribute.setText(".launch file attribute:");
+		return composite;
+	}
 
-    launchFileAttribute = new Text(composite, SWT.BORDER | SWT.READ_ONLY | SWT.WRAP | SWT.MULTI);
-    launchFileAttribute.setText(
-        "<stringAttribute key=\"org.eclipse.debug.core.source_locator_id\" value=\"org.eclipse.m2e.sourcelookupDirector\"/>\n");
-    textGridDataFactory.applyTo(launchFileAttribute);
+	private void createLabel(String text, Composite composite) {
+		new Label(composite, SWT.NONE).setText(text);
+	}
 
-    return composite;
-  }
+	private void createTextField(String text, Composite composite, GridDataFactory gridDataFactory) {
+		Text textField = new Text(composite, SWT.BORDER | SWT.READ_ONLY | SWT.WRAP | SWT.MULTI);
+		gridDataFactory.applyTo(textField);
+		textField.setText(text);
+	}
 
-  private void disableScrollingFor(Composite composite) {
-    Composite temp = composite;
-    while (temp != null && !(temp instanceof ScrolledComposite)) {
-       temp = temp.getParent();
-    }
-    ScrolledComposite scrolledComposite = (ScrolledComposite)temp;
-    if (scrolledComposite != null) {
-        ControlAdapter resizeAndWrapRatherThanScroll = new ControlAdapter() {
-            @Override public void controlResized(ControlEvent e) {
-                if (composite.isVisible()) {
-                    scrolledComposite.setMinWidth(scrolledComposite.getSize().x);
-                }
-            }
-        };
-        scrolledComposite.addControlListener(resizeAndWrapRatherThanScroll);
-        composite.addDisposeListener(e -> scrolledComposite.removeControlListener(resizeAndWrapRatherThanScroll));
-    }
-  }
+	private void disableScrollingFor(Composite composite) {
+		Composite temp = composite;
+		while (temp != null && !(temp instanceof ScrolledComposite)) {
+			temp = temp.getParent();
+		}
+		ScrolledComposite scrolledComposite = (ScrolledComposite) temp;
+		if (scrolledComposite != null) {
+			ControlListener resizeAndWrapRatherThanScroll = ControlListener.controlResizedAdapter(e -> {
+				if (composite.isVisible()) {
+					scrolledComposite.setMinWidth(scrolledComposite.getSize().x);
+				}
+			});
+			scrolledComposite.addControlListener(resizeAndWrapRatherThanScroll);
+			composite.addDisposeListener(e -> scrolledComposite.removeControlListener(resizeAndWrapRatherThanScroll));
+		}
+	}
 }

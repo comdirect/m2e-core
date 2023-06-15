@@ -1,14 +1,14 @@
 /*******************************************************************************
- * Copyright (c) 2021 Christoph Läubrich
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v2.0
- * which accompanies this distribution, and is available at
- * https://www.eclipse.org/legal/epl-v20.html
+ * Copyright (c) 2021, 2023 Christoph Läubrich and others
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0.
  *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *      Christoph Läubrich - initial API and implementation
+ *   Christoph Läubrich - initial API and implementation
  *******************************************************************************/
 package org.eclipse.m2e.pde.target;
 
@@ -17,6 +17,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +36,7 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.internal.IMavenToolbox;
+import org.eclipse.m2e.pde.target.shared.MavenBundleWrapper;
 import org.eclipse.pde.core.target.TargetBundle;
 import org.eclipse.pde.internal.core.NLResourceHelper;
 import org.eclipse.pde.internal.core.feature.AbstractFeatureModel;
@@ -67,10 +69,6 @@ class MavenPomFeatureModel extends AbstractFeatureModel {
 		return null;
 	}
 
-	public Artifact getArtifact() {
-		return artifact;
-	}
-
 	@Override
 	public void load() throws CoreException {
 		editable = true;
@@ -83,7 +81,7 @@ class MavenPomFeatureModel extends AbstractFeatureModel {
 				id += ".source";
 			}
 			f.setId(id);
-			f.setVersion(TargetBundles.createOSGiVersion(model.getVersion()).toString());
+			f.setVersion(MavenBundleWrapper.createOSGiVersion(model.getVersion()).toString());
 			String name = model.getName();
 			if (isSourceFeature) {
 				name += " (Source)";
@@ -91,52 +89,53 @@ class MavenPomFeatureModel extends AbstractFeatureModel {
 			f.setLabel(name);
 			String description = model.getDescription();
 			String url = model.getUrl();
-			IFeatureInfo info = f.getModel().getFactory().createInfo(IFeature.INFO_DESCRIPTION);
-			info.setDescription(description);
-			info.setURL(url);
-			f.setFeatureInfo(info, info.getIndex());
+			addFeatureInfo(f, IFeature.INFO_DESCRIPTION, description, url);
 
 			List<License> licenses = model.getLicenses();
 			if (!licenses.isEmpty()) {
-				licenses.stream().map(license -> {
-					return Stream.<String>builder().add(license.getName()).add(license.getUrl())
-							.add(license.getComments()).build().filter(Objects::nonNull)
-							.filter(Predicate.not(String::isBlank)).collect(Collectors.joining("\r\n"));
-				}).collect(Collectors.joining("--------------------------------------------------\r\n"));
+				String newLine = System.lineSeparator();
+				licenses.stream()
+						.map(license -> Stream.of(license.getName(), license.getUrl(), license.getComments())
+								.filter(Objects::nonNull).filter(Predicate.not(String::isBlank))
+								.collect(Collectors.joining(newLine)))
+						.collect(Collectors.joining("--------------------------------------------------" + newLine));
 			}
 			Optional<DependencyNode> dependencyNode = targetBundles.getDependencyNode(artifact);
-			TargetBundle[] dependencies = dependencyNode.map(node -> {
+			List<TargetBundle> dependencies = dependencyNode.map(node -> {
 				PreorderNodeListGenerator nlg = new PreorderNodeListGenerator();
 				node.accept(nlg);
-				return nlg;
-			}).map(nlg -> nlg.getArtifacts(true)).stream().flatMap(Collection::stream).filter(a -> a.getFile() != null)
-					.flatMap(a -> targetBundles.getTargetBundle(a, isSourceFeature).stream())
-					.toArray(TargetBundle[]::new);
-			IFeaturePlugin[] featurePlugins = new IFeaturePlugin[dependencies.length];
-			for (int i = 0; i < featurePlugins.length; i++) {
-				FeaturePlugin plugin = new MavenFeaturePlugin(dependencies[i], this);
+				return nlg.getArtifacts(true);
+			}).stream().flatMap(Collection::stream).filter(a -> a.getFile() != null)
+					.flatMap(a -> targetBundles.getTargetBundle(a, isSourceFeature).stream()).toList();
+			List<IFeaturePlugin> featurePlugins = new ArrayList<>();
+			for (TargetBundle bundle : dependencies) {
+				FeaturePlugin plugin = new MavenFeaturePlugin(bundle, this);
 				plugin.setParent(f);
-				featurePlugins[i] = plugin;
+				featurePlugins.add(plugin);
 			}
-			f.addPlugins(featurePlugins);
+			f.addPlugins(featurePlugins.toArray(FeaturePlugin[]::new));
 			setEnabled(true);
 			updateTimeStampWith(System.currentTimeMillis());
 			if (DEBUG_FEATURE_XML) {
 				File file = new File("/tmp/" + f.getId() + "/feature.xml");
-				File installLocation = file.getParentFile();
-				installLocation.mkdirs();
+				file.getParentFile().mkdirs();
 				try (PrintWriter writer = new PrintWriter(file, StandardCharsets.UTF_8)) {
 					f.write("    ", writer);
-					writer.flush();
 				}
 			}
 		} catch (IOException e) {
 			throw new CoreException(Status.error("failed to load pom file"));
 		} finally {
 			editable = false;
-
 		}
 		setLoaded(true);
+	}
+
+	private void addFeatureInfo(IFeature feature, int infoIndex, String description, String url) throws CoreException {
+		IFeatureInfo info = feature.getModel().getFactory().createInfo(infoIndex);
+		info.setDescription(description);
+		info.setURL(url);
+		feature.setFeatureInfo(info, info.getIndex());
 	}
 
 	@Override
@@ -162,8 +161,7 @@ class MavenPomFeatureModel extends AbstractFeatureModel {
 	@Override
 	public IFeature getFeature() {
 		if (feature == null) {
-			Feature f = new MavenPomFeature(this);
-			this.feature = f;
+			this.feature = new MavenPomFeature(this);
 		}
 		return feature;
 	}

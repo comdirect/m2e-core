@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-	Copyright (c) 2011, 2021 Sonatype, Inc. and others
+	Copyright (c) 2011, 2023 Sonatype, Inc. and others
 	All rights reserved. This program and the accompanying materials
 	are made available under the terms of the Eclipse Public License 2.0
 	which accompanies this distribution, and is available at
@@ -55,7 +55,7 @@
 				<plugin>
 					<groupId>biz.aQute.bnd</groupId>
 					<artifactId>bnd-maven-plugin</artifactId>
-					<version>6.3.1</version>
+					<version>6.4.0</version>
 					<extensions>true</extensions>
 					<configuration>
 						<bnd>
@@ -66,12 +66,15 @@
 								-nouses: true
 								-nodefaultversion: true
 								-noextraheaders: true
-								-snapshot: ${buildQualifier}
+								-snapshot: ${def;buildQualifier;qualifier}
 								-removeheaders: Private-Package
 
 								Import-Package: !*
 								Automatic-Module-Name: ${bsn}
 								Eclipse-BundleShape: dir
+								
+								gitCommitId = ${system;git log -n 1 --pretty=format:%H .}
+								gitRelativePath = ${system;git rev-parse --show-prefix};
 								Eclipse-SourceReferences: ${scmConnectionRaw};path="${gitRelativePath}";commitId=${gitCommitId}
 							]]>
 						</bnd>
@@ -90,7 +93,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-dependency-plugin</artifactId>
-					<version>3.3.0</version>
+					<version>3.4.0</version>
 					<configuration>
 						<overWriteIfNewer>true</overWriteIfNewer>
 						<includeScope>runtime</includeScope> <!-- only include runtime and compile time dependencies, not test or provided! -->
@@ -102,22 +105,14 @@
 					<version>3.3.0</version>
 				</plugin>
 				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-antrun-plugin</artifactId>
-					<version>3.1.0</version>
-					<dependencies>
-						<dependency>
-							<groupId>ant-contrib</groupId>
-							<artifactId>ant-contrib</artifactId>
-							<version>1.0b3</version>
-							<exclusions>
-								<exclusion>
-									<groupId>ant</groupId>
-									<artifactId>ant</artifactId>
-								</exclusion>
-							</exclusions>
-						</dependency>
-					</dependencies>
+					<groupId>org.eclipse.tycho</groupId>
+					<artifactId>tycho-p2-plugin</artifactId>
+					<version>${tycho-version}</version>
+					<configuration>
+						<supportedProjectTypes>
+							<value>jar</value>
+						</supportedProjectTypes>
+					</configuration>
 				</plugin>
 			</plugins>
 		</pluginManagement>
@@ -142,11 +137,26 @@
 				</executions>
 			</plugin>
 			<plugin>
+				<groupId>org.eclipse.tycho</groupId>
+				<artifactId>tycho-packaging-plugin</artifactId>
+				<configuration>
+					<jgit.ignore>NOTHING</jgit.ignore> <!-- Overwrite values from parent -->
+				</configuration>
+				<executions>
+					<execution>
+						<?m2e execute onIncremental?>
+						<id>compute-qualifier</id>
+						<goals>
+							<goal>build-qualifier</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
 				<executions>
 					<execution>
-						<?m2e execute onIncremental?>
 						<id>fetch-dependency-jars</id>
 						<goals>
 							<goal>copy-dependencies</goal>
@@ -186,100 +196,6 @@
 				</executions>
 			</plugin>
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-antrun-plugin</artifactId>
-				<executions>
-					<execution>
-						<!-- TODO: Make the tycho-packaging-plugin:build-qualifier goal to work with non 'eclipse-plugin' typed projects -->
-						<?m2e execute onIncremental?>
-						<id>generate-build-qualifier</id>
-						<goals>
-							<goal>run</goal>
-						</goals>
-						<phase>initialize</phase>
-						<configuration>
-							<exportAntProperties>true</exportAntProperties>
-							<target>
-								<taskdef resource="net/sf/antcontrib/antlib.xml" />
-								<mkdir dir="${project.build.directory}/git" />
-
-								<exec executable="git" dir="${project.basedir}" output="${project.build.directory}/git/buildQualifier" failonerror="true">
-									<arg value="log" />
-									<arg value="-n 1" />
-									<arg value="--pretty=format:%cd" />
-									<arg value="--date=format:${buildqualifier.format}" />
-									<arg value="." />
-								</exec>
-								<loadfile property="buildQualifier" srcFile="${project.build.directory}/git/buildQualifier" />
-								<delete file="${project.build.directory}/git/buildQualifier" />
-								<propertyregex property="buildQualifier" input="${buildQualifier}" regexp="\s" replace="" override="true" /> <!-- strip off leading/trailing whitespace -->
-								<echo message="buildQualifier: ${buildQualifier}" level="info" />
-
-								<property name="outputTimestamp" value="${buildQualifier}" />
-								<propertyregex property="qualifiedVersion" input="${project.version}" regexp="-SNAPSHOT" replace=".${buildQualifier}" />
-								<echo message="qualifiedVersion: ${qualifiedVersion}" level="info" />
-
-								<exec executable="git" dir="${project.basedir}" output="${project.build.directory}/git/commitId" failonerror="true">
-									<arg value="log" />
-									<arg value="-n 1" />
-									<arg value="--pretty=format:%H" />
-									<arg value="." />
-								</exec>
-								<loadfile property="gitCommitId" srcFile="${project.build.directory}/git/commitId" />
-								<delete file="${project.build.directory}/git/commitId" />
-								<propertyregex property="gitCommitId" input="${gitCommitId}" regexp="\s" replace="" override="true" /> <!-- strip off leading/trailing whitespace -->
-								<echo message="gitCommitHash: ${gitCommitId}" level="info" />
-
-								<exec executable="git" dir="${project.basedir}" output="${project.build.directory}/git/relativePath" failonerror="true">
-									<arg value="rev-parse" />
-									<arg value="--show-prefix" />
-								</exec>
-								<loadfile property="gitRelativePath" srcFile="${project.build.directory}/git/relativePath" />
-								<delete file="${project.build.directory}/git/relativePath" />
-								<propertyregex property="gitRelativePath" input="${gitRelativePath}" regexp="\s" replace="" global="true" override="true" /> <!-- strip off leading/trailing whitespace -->
-								<echo message="gitRelativePath: ${gitRelativePath}" level="info" />
-							</target>
-						</configuration>
-					</execution>
-					<execution>
-						<?m2e ignore?>
-						<id>build-sources-jar</id>
-						<goals>
-							<goal>run</goal>
-						</goals>
-						<phase>package</phase>
-						<configuration>
-							<target>
-								<taskdef resource="net/sf/antcontrib/antlib.xml" />
-								<if>
-									<equals arg1="${project.packaging}" arg2="pom" /> <!-- only consider children of m2e-maven-runtime project -->
-									<then>
-										<echo message="Skip packing sources jar for pom project" />
-									</then>
-									<else>
-										<!-- Delete directories that are empty after moving the java-sources to the root -->
-										<delete includeemptydirs="true">
-											<fileset dir="${outputDirectory.sources}">
-												<and>
-													<size value="0" />
-													<type type="dir" />
-												</and>
-											</fileset>
-										</delete>
-										<jar destfile="${project.build.directory}/${project.artifactId}.source_${qualifiedVersion}.jar"
-											manifestencoding="UTF-8" defaultexcludes="false" duplicate="fail">
-											<fileset dir="src/main/java" erroronmissingdir="false" />
-											<fileset dir="src/main/resources" erroronmissingdir="false" />
-											<fileset dir="${outputDirectory.sources}" />
-										</jar>
-									</else>
-								</if>
-							</target>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
 				<groupId>biz.aQute.bnd</groupId>
 				<artifactId>bnd-maven-plugin</artifactId>
 				<executions>
@@ -309,20 +225,32 @@
 				<executions>
 					<execution>
 						<?m2e ignore?>
-						<id>attach-sources-artifact</id>
+						<id>add-source-resources</id>
 						<phase>package</phase>
 						<goals>
-							<goal>attach-artifact</goal>
+							<goal>add-resource</goal>
 						</goals>
 						<configuration>
-							<artifacts>
-								<artifact>
-									<file>${project.build.directory}/${project.artifactId}.source_${qualifiedVersion}.jar</file>
-									<type>java-source</type>
-									<classifier>sources</classifier>
-								</artifact>
-							</artifacts>
+							<resources>
+								<resource>
+									<directory>${outputDirectory.sources}</directory>
+								</resource>
+							</resources>
 						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>3.2.1</version>
+				<executions>
+					<execution>
+						<?m2e ignore?>
+						<id>sources-jar</id>
+						<goals>
+							<goal>jar-no-fork</goal>
+						</goals>
 					</execution>
 				</executions>
 			</plugin>
@@ -338,26 +266,6 @@
 							<goal>generate-pde-source-header</goal>
 						</goals>
 						<phase>package</phase>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.eclipse.tycho</groupId>
-				<artifactId>tycho-p2-plugin</artifactId>
-				<version>${tycho-version}</version>
-				<executions>
-					<execution>
-						<?m2e ignore?>
-						<id>attached-p2-metadata</id> <!-- Required to make this project's sources discoverable for the sources-features -->
-						<goals>
-							<goal>p2-metadata</goal>
-						</goals>
-						<phase>package</phase>
-						<configuration>
-							<supportedProjectTypes>
-								<value>jar</value>
-							</supportedProjectTypes>
-						</configuration>
 					</execution>
 				</executions>
 			</plugin>
@@ -387,6 +295,7 @@
 					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-antrun-plugin</artifactId>
+						<version>3.1.0</version>
 						<executions>
 							<execution>
 								<?m2e ignore?>
@@ -440,6 +349,19 @@
 								</configuration>
 							</execution>
 						</executions>
+						<dependencies>
+							<dependency>
+								<groupId>ant-contrib</groupId>
+								<artifactId>ant-contrib</artifactId>
+								<version>1.0b3</version>
+								<exclusions>
+									<exclusion>
+										<groupId>ant</groupId>
+										<artifactId>ant</artifactId>
+									</exclusion>
+								</exclusions>
+							</dependency>
+						</dependencies>
 					</plugin>
 				</plugins>
 			</build>

@@ -11,6 +11,8 @@
 package org.eclipse.m2e.core;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -20,8 +22,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.maven.execution.MavenExecutionResult;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
-import org.apache.maven.shared.utils.io.FileUtils;
+import org.apache.maven.project.ProjectBuildingRequest;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IMarker;
 import org.eclipse.core.resources.IProject;
@@ -30,6 +35,8 @@ import org.eclipse.core.resources.IncrementalProjectBuilder;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.m2e.core.embedder.IMaven;
+import org.eclipse.m2e.core.embedder.IMavenExecutionContext;
 import org.eclipse.m2e.core.internal.MavenPluginActivator;
 import org.eclipse.m2e.core.project.IMavenProjectFacade;
 import org.eclipse.m2e.core.project.MavenProjectInfo;
@@ -55,7 +62,7 @@ public class MavenBugsTest extends AbstractMavenProjectTestCase {
         FileLocator.toFileURL(getClass().getResource("/resources/projects/testMNG6530")).toURI());
     File tempDirectory = Files.createTempDirectory(getClass().getSimpleName()).toFile();
     try {
-      FileUtils.copyDirectoryStructure(sourceDirectory, tempDirectory);
+      FileUtils.copyDirectory(sourceDirectory, tempDirectory);
       List<MavenProjectInfo> toImport = new ArrayList<>(2);
       toImport.add(new MavenProjectInfo("", new File(tempDirectory, "pom.xml"), null, null));
       toImport.add(new MavenProjectInfo("", new File(tempDirectory, "child/pom.xml"), null, null));
@@ -68,11 +75,11 @@ public class MavenBugsTest extends AbstractMavenProjectTestCase {
         IMavenProjectFacade childFacade = MavenPlugin.getMavenProjectRegistry().getProject(child);
         MavenProject mavenProject = childFacade.getMavenProject(new NullProgressMonitor());
         assertEquals("bar", mavenProject.getProperties().get("foo"));
-        
+
 		IFile pomXml = parent.getFile("pom.xml");
 		String content = Files.readString(Path.of(pomXml.getLocationURI())).replace("bar", "lol");
 		pomXml.setContents(new ByteArrayInputStream(content.getBytes()), true, false, null);
-		
+
         MavenPlugin.getProjectConfigurationManager().updateProjectConfiguration(child, monitor);
         waitForJobsToComplete();
         mavenProject = childFacade.getMavenProject(monitor);
@@ -93,7 +100,7 @@ public class MavenBugsTest extends AbstractMavenProjectTestCase {
 		IMavenProjectFacade facade = MavenPluginActivator.getDefault().getMavenProjectManagerImpl().create(project.getFile("child/pom.xml"),
 			true, monitor);
 		Assert.assertNotNull(facade);
-		File[] multiModuleDirectory = new File[] { null }; 
+		File[] multiModuleDirectory = new File[] { null };
 		facade.createExecutionContext().execute((context, monitor) -> multiModuleDirectory[0] = context.getExecutionRequest().getMultiModuleProjectDirectory(), null);
 		assertEquals(project.getLocation().toFile(), multiModuleDirectory[0]);
   }
@@ -106,5 +113,25 @@ public class MavenBugsTest extends AbstractMavenProjectTestCase {
 		waitForJobsToComplete(monitor);
 		IMarker[] markers = project.findMarkers(IMarker.PROBLEM, true, IResource.DEPTH_INFINITE);
 		assertEquals(Arrays.toString(markers), 0, markers.length);
+	}
+
+	@Test
+	public void testAllProjects() throws Exception {
+		IMaven maven = MavenPlugin.getMaven();
+		File pomFile = new File("resources/projects/simplePomOK/pom.xml");
+		IMavenExecutionContext context = maven.createExecutionContext();
+		MavenExecutionResult result = context.execute((context1, monitor1) -> {
+			ProjectBuildingRequest configuration = context.newProjectBuildingRequest();
+			configuration.setResolveDependencies(true);
+			return maven.readMavenProject(pomFile, configuration);
+		}, monitor);
+		assertFalse(result.hasExceptions());
+		MavenProject project = result.getProject();
+		result = context.execute(project, (context1, monitor) -> {
+			MavenSession session = context1.getSession();
+			assertNotNull("getProjects", session.getProjects());
+			assertNotNull("getAllProjects", session.getAllProjects());
+			return session.getResult();
+		}, monitor);
 	}
 }

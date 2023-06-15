@@ -231,8 +231,7 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
   public MavenExecutionPlan calculateExecutionPlan(MavenProject project, List<String> goals, boolean setup,
       IProgressMonitor monitor) throws CoreException {
     return getExecutionContext().execute(project,
-        (context, pm) -> calculateExecutionPlan(context.getSession(), goals, setup),
-        monitor);
+        (context, pm) -> calculateExecutionPlan(context.getSession(), goals, setup), monitor);
   }
 
   private MojoExecution setupMojoExecution(MavenSession session, MavenProject project, MojoExecution execution)
@@ -256,8 +255,7 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
   public MojoExecution setupMojoExecution(MavenProject project, MojoExecution execution, IProgressMonitor monitor)
       throws CoreException {
     return getExecutionContext().execute(project,
-        (context, pm) -> setupMojoExecution(context.getSession(), project, execution),
-        monitor);
+        (context, pm) -> setupMojoExecution(context.getSession(), project, execution), monitor);
   }
 
   @Override
@@ -396,7 +394,7 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
 
   @Override
   public void mavenConfigurationChange(MavenConfigurationChangeEvent event) throws CoreException {
-    if(MavenConfigurationChangeEvent.P_USER_SETTINGS_FILE.equals(event.key())
+    if(MavenPreferenceConstants.P_USER_SETTINGS_FILE.equals(event.key())
         || MavenPreferenceConstants.P_GLOBAL_SETTINGS_FILE.equals(event.key())) {
       reloadSettings();
     }
@@ -486,7 +484,7 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
 
   @Deprecated
   @Override
-  public void detachFromSession(MavenProject project) throws CoreException {
+  public void detachFromSession(MavenProject project) {
     //noop now
   }
 
@@ -527,9 +525,8 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
   }
 
   public MavenProject resolveParentProject(MavenProject child, IProgressMonitor monitor) throws CoreException {
-    return getExecutionContext().execute(child,
-        (context, pm) -> resolveParentProject(context.getRepositorySession(), child,
-        context.getExecutionRequest().getProjectBuildingRequest()), monitor);
+    return getExecutionContext().execute(child, (context, pm) -> resolveParentProject(context.getRepositorySession(),
+        child, context.getExecutionRequest().getProjectBuildingRequest()), monitor);
   }
 
   @Override
@@ -757,7 +754,7 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
    * Resolves a nested configuration parameter from the given {@code mojoExecution}. It coerces from String to the given
    * type and considers expressions and default values. Deliberately no public API yet as probably refactored in the
    * near future.
-   * 
+   *
    * @param <T>
    * @param project the Maven project
    * @param mojoExecution the mojo execution from which to retrieve the configuration value
@@ -1059,7 +1056,6 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
     }
   }
 
-
   @Override
   public ClassLoader getProjectRealm(MavenProject project) {
     Objects.requireNonNull(project);
@@ -1094,8 +1090,7 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
    * @since 1.4
    */
   public static <V> V execute(IMaven maven, boolean offline, boolean forceDependencyUpdate, ICallable<V> callable,
-      IProgressMonitor monitor)
-      throws CoreException {
+      IProgressMonitor monitor) throws CoreException {
     IMavenExecutionContext context = maven.createExecutionContext();
     context.getExecutionRequest().setOffline(offline);
     context.getExecutionRequest().setUpdateSnapshots(forceDependencyUpdate);

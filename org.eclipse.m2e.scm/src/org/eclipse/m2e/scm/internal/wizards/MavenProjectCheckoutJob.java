@@ -32,7 +32,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.IJobChangeEvent;
-import org.eclipse.core.runtime.jobs.ISchedulingRule;
 import org.eclipse.core.runtime.jobs.JobChangeAdapter;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.window.Window;
@@ -54,6 +53,7 @@ import org.apache.maven.model.Model;
 
 import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.embedder.MavenModelManager;
+import org.eclipse.m2e.core.internal.jobs.MavenWorkspaceJob;
 import org.eclipse.m2e.core.internal.project.ProjectConfigurationManager;
 import org.eclipse.m2e.core.project.LocalProjectScanner;
 import org.eclipse.m2e.core.project.MavenProjectInfo;
@@ -71,7 +71,7 @@ import org.eclipse.m2e.scm.internal.Messages;
  *
  * @author Eugene Kuleshov
  */
-public abstract class MavenProjectCheckoutJob extends WorkspaceJob {
+public abstract class MavenProjectCheckoutJob extends MavenWorkspaceJob {
   private static final Logger log = LoggerFactory.getLogger(MavenProjectCheckoutJob.class);
 
   final ProjectImportConfiguration configuration;
@@ -210,12 +210,7 @@ public abstract class MavenProjectCheckoutJob extends WorkspaceJob {
 
       if(checkoutAllProjects) {
         WorkspaceJob job = new ImportMavenProjectsJob(projects, workingSets, configuration);
-
-        ISchedulingRule rule = ResourcesPlugin.getWorkspace().getRuleFactory()
-            .modifyRule(ResourcesPlugin.getWorkspace().getRoot());
-        job.setRule(rule);
         job.schedule();
-
       } else {
         PlatformUI.getWorkbench().getDisplay().asyncExec(() -> {
           MavenImportWizard wizard = new MavenImportWizard(configuration, collectedLocations);

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-	Copyright (c) 2010, 2021 Sonatype, Inc. and others
+	Copyright (c) 2010, 2023 Sonatype, Inc. and others
 	All rights reserved. This program and the accompanying materials
 	are made available under the terms of the Eclipse Public License 2.0
 	which accompanies this distribution, and is available at
@@ -25,13 +25,16 @@
 	<name>Maven Integration for Eclipse (root)</name>
 
 	<properties>
-		<tycho.testArgLine>-Xmx800m</tycho.testArgLine>
+		<rcptt-maven-version>2.5.4</rcptt-maven-version>
+		<tychoDefaultTestArgLine>-Xmx800m</tychoDefaultTestArgLine>
+		<tycho.testArgLine>${tychoDefaultTestArgLine}</tycho.testArgLine>
 		<tycho.surefire.timeout>900</tycho.surefire.timeout>
 		<tycho.surefire.useUIHarness>true</tycho.surefire.useUIHarness>
 		<tycho.surefire.useUIThread>true</tycho.surefire.useUIThread>
 		<jacoco.destFile>../target/jacoco.exec</jacoco.destFile>
 		<tycho.scmUrl>scm:git:https://github.com/eclipse-m2e/m2e-core.git</tycho.scmUrl>
 		<trimStackTrace>false</trimStackTrace>
+		<ecjVersion>3.32.0</ecjVersion>
 	</properties>
 
 	<modules>
@@ -79,9 +82,6 @@
 		<module>org.eclipse.m2e.pde.feature</module>
 		<module>org.eclipse.m2e.repository</module>
 
-		<!-- products -->
-		<module>products</module>
-
 		<!-- testing -->
 		<module>org.eclipse.m2e.core.tests</module>
 		<module>org.eclipse.m2e.core.ui.tests</module>
@@ -92,18 +92,25 @@
 		<module>org.eclipse.m2e.profiles.core.tests</module>
 		<module>org.eclipse.m2e.apt.tests</module>
 		<module>org.eclipse.m2e.pde.connector.tests</module>
+		<module>org.eclipse.m2e.pde.target.tests</module>
+
+		<!-- products -->
+		<module>products</module>
+
+		<!-- UI/Integration tests -->
+		<module>org.eclipse.m2e.rcptt.tests</module>
 	</modules>
 
 	<dependencies>
 		<dependency>
 			<groupId>org.eclipse.m2e</groupId>
 			<artifactId>org.eclipse.m2e.archetype.common</artifactId>
-			<version>3.2.102-SNAPSHOT</version>
+			<version>3.2.103-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.eclipse.m2e</groupId>
 			<artifactId>org.eclipse.m2e.maven.runtime</artifactId>
-			<version>3.8.604-SNAPSHOT</version>
+			<version>3.9.100-SNAPSHOT</version>
 		</dependency>
 	</dependencies>
 
@@ -119,7 +126,6 @@
 				<groupId>org.eclipse.tycho</groupId>
 				<artifactId>target-platform-configuration</artifactId>
 				<configuration>
-					<pomDependencies>consider</pomDependencies>
 					<target>
 						<artifact>
 							<groupId>org.eclipse.m2e</groupId>
@@ -127,6 +133,9 @@
 							<version>2.1.0-SNAPSHOT</version>
 						</artifact>
 					</target>
+					<dependency-resolution>
+						<localArtifacts>ignore</localArtifacts>
+					</dependency-resolution>
 					<environments>
 						<environment>
 							<os>win32</os>
@@ -149,81 +158,6 @@
 							<arch>aarch64</arch>
 						</environment>
 					</environments>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.eclipse.tycho</groupId>
-				<artifactId>tycho-source-plugin</artifactId>
-				<version>${tycho-version}</version>
-				<executions>
-					<execution>
-						<id>plugin-source</id>
-						<goals>
-							<goal>plugin-source</goal>
-						</goals>
-					</execution>
-					<execution>
-						<id>feature-source</id>
-						<goals>
-							<goal>feature-source</goal>
-						</goals>
-						<configuration>
-							<excludes>
-								<plugin id="org.eclipse.m2e.workspace.cli" />
-							</excludes>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.jacoco</groupId>
-				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>0.8.8</version>
-				<executions>
-					<execution>
-						<goals>
-							<goal>prepare-agent</goal>
-						</goals>
-					</execution>
-				</executions>
-				<configuration>
-					<append>true</append>
-					<includes>
-						<include>org.eclipse.m2e*</include>
-						<include>org.apache.maven*</include>
-						<include>org.eclipse.aether*</include>
-					</includes>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.eclipse.tycho</groupId>
-				<artifactId>tycho-p2-plugin</artifactId>
-				<version>${tycho-version}</version>
-				<executions>
-					<execution>
-						<id>p2-metadata</id>
-						<goals>
-							<goal>p2-metadata</goal>
-						</goals>
-						<phase>package</phase>
-					</execution>
-				</executions>
-				<configuration>
-					<defaultP2Metadata>false</defaultP2Metadata>
-					<baselineRepositories>
-						<repository>
-							<url>https://download.eclipse.org/technology/m2e/snapshots/latest/</url>
-						</repository>
-					</baselineRepositories>
-					<baselineReplace>common</baselineReplace>
-					<baselineMode>${tycho.p2.baselineMode}</baselineMode>
-					<writeComparatorDelta>true</writeComparatorDelta>
-					<ignoredPatterns>
-						<pattern>META-INF/ECLIPSE_.RSA</pattern>
-						<pattern>META-INF/ECLIPSE_.SF</pattern>
-						<pattern>**/org/fusesource/jansi/internal/native/Mac/*/libjansi.jnilib</pattern>
-						<pattern>org/eclipse/m2e/core/internal/lifecyclemapping/model/**/*.java</pattern>
-					</ignoredPatterns>
 				</configuration>
 			</plugin>
 		</plugins>
@@ -259,40 +193,6 @@
 				</plugin>
 				<plugin>
 					<groupId>org.eclipse.tycho</groupId>
-					<artifactId>tycho-packaging-plugin</artifactId>
-					<version>${tycho-version}</version>
-					<configuration>
-						<format>yyyyMMdd-HHmm</format>
-						<sourceReferences>
-							<generate>true</generate>
-						</sourceReferences>
-						<!-- resources whose changes usually don't affect the binary output -->
-						<jgit.ignore>
-							.project
-							.classpath
-							.settings/
-							.polyglot.*
-							pom.xml
-							README.md
-						</jgit.ignore>
-						<jgit.dirtyWorkingTree>warning</jgit.dirtyWorkingTree>
-						<timestampProvider>jgit</timestampProvider>
-					</configuration>
-					<dependencies>
-						<dependency>
-							<groupId>org.eclipse.tycho.extras</groupId>
-							<artifactId>tycho-sourceref-jgit</artifactId>
-							<version>${tycho-version}</version>
-						</dependency>
-						<dependency>
-							<groupId>org.eclipse.tycho</groupId>
-							<artifactId>tycho-buildtimestamp-jgit</artifactId>
-							<version>${tycho-version}</version>
-						</dependency>
-					</dependencies>
-				</plugin>
-				<plugin>
-					<groupId>org.eclipse.tycho</groupId>
 					<artifactId>tycho-surefire-plugin</artifactId>
 					<version>${tycho-version}</version>
 					<configuration>
@@ -313,6 +213,13 @@
 					<groupId>org.eclipse.tycho</groupId>
 					<artifactId>tycho-compiler-plugin</artifactId>
 					<version>${tycho-version}</version>
+					<dependencies>
+						<dependency>
+							<groupId>org.eclipse.jdt</groupId>
+							<artifactId>ecj</artifactId>
+							<version>${ecjVersion}</version>
+						</dependency>
+					</dependencies>
 				</plugin>
 				<plugin>
 					<groupId>org.eclipse.tycho</groupId>
@@ -338,8 +245,30 @@
 			</activation>
 			<properties>
 				<!-- SWT on Mac OS needs to be started on main thread -->
-				<tycho.testArgLine>-XstartOnFirstThread</tycho.testArgLine>
+				<tycho.testArgLine>-XstartOnFirstThread ${tychoDefaultTestArgLine}</tycho.testArgLine>
 			</properties>
+			<build>
+				<pluginManagement>
+					<plugins>
+						<plugin>
+							<groupId>org.eclipse.tycho</groupId>
+							<artifactId>tycho-surefire-plugin</artifactId>
+							<version>${tycho-version}</version>
+							<configuration>
+								<dependencies combine.children="append">
+									<!--this dependency is needed to detect and set the default VM correctly on Mac OS,
+									 https://github.com/eclipse-jdt/eclipse.jdt.debug/tree/master/org.eclipse.jdt.launching.macosx -->
+									<dependency>
+										<artifactId>org.eclipse.jdt.launching.macosx</artifactId>
+										<type>eclipse-plugin</type>
+										<version>0.0.0</version>
+									</dependency>
+								</dependencies>
+							</configuration>
+						</plugin>
+					</plugins>
+				</pluginManagement>
+			</build>
 		</profile>
 		<profile>
 			<id>its</id>

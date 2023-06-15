@@ -1,14 +1,14 @@
 /*******************************************************************************
- * Copyright (c) 2018, 2020 Christoph Läubrich
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v2.0
- * which accompanies this distribution, and is available at
- * https://www.eclipse.org/legal/epl-v20.html
+ * Copyright (c) 2018, 2023 Christoph Läubrich and others
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0.
  *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *      Christoph Läubrich - initial API and implementation
+ *   Christoph Läubrich - initial API and implementation
  *******************************************************************************/
 package org.eclipse.m2e.pde.ui.target.adapter;
 
@@ -24,13 +24,12 @@ import org.osgi.service.component.annotations.Deactivate;
 		IAdapterFactory.SERVICE_PROPERTY_ADAPTER_NAMES + "=org.eclipse.jface.viewers.ILabelProvider" })
 public class MavenTargetBundleAdapterFactory implements IAdapterFactory {
 
-	private final ILabelProvider LABEL_PROVIDER = new MavenTargetBundleLabelProvider();
+	private final ILabelProvider labelProvider = new MavenTargetBundleLabelProvider();
+
 	@Override
 	public <T> T getAdapter(Object adaptableObject, Class<T> adapterType) {
-		if (adaptableObject instanceof MavenTargetBundle) {
-			if (adapterType == ILabelProvider.class) {
-				return adapterType.cast(LABEL_PROVIDER);
-			}
+		if (adaptableObject instanceof MavenTargetBundle && adapterType == ILabelProvider.class) {
+			return adapterType.cast(labelProvider);
 		}
 		return null;
 	}
@@ -42,7 +41,7 @@ public class MavenTargetBundleAdapterFactory implements IAdapterFactory {
 
 	@Deactivate
 	void dispose() {
-		LABEL_PROVIDER.dispose();
+		labelProvider.dispose();
 	}
 
 }

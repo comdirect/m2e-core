@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2019 Sonatype, Inc. and others.
+ * Copyright (c) 2008, 2023 Sonatype, Inc. and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -15,14 +15,14 @@ package org.eclipse.m2e.jdt.internal;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Set;
 
+import org.osgi.framework.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +36,7 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.SubMonitor;
 import org.eclipse.jdt.core.IAccessRule;
+import org.eclipse.jdt.core.IClasspathAttribute;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaCore;
@@ -44,18 +45,12 @@ import org.eclipse.jdt.launching.JavaRuntime;
 import org.eclipse.jdt.launching.environments.IExecutionEnvironment;
 import org.eclipse.jdt.launching.environments.IExecutionEnvironmentsManager;
 
-import org.apache.maven.artifact.versioning.ArtifactVersion;
-import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.apache.maven.artifact.versioning.InvalidVersionSpecificationException;
-import org.apache.maven.artifact.versioning.Restriction;
-import org.apache.maven.artifact.versioning.VersionRange;
 import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.project.MavenProject;
 
 import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.internal.M2EUtils;
-import org.eclipse.m2e.core.internal.embedder.MavenImpl;
 import org.eclipse.m2e.core.project.IMavenProjectFacade;
 import org.eclipse.m2e.core.project.IProjectConfigurationManager;
 import org.eclipse.m2e.core.project.configurator.AbstractProjectConfigurator;
@@ -89,12 +84,6 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
 
   public static final String COMPILER_PLUGIN_GROUP_ID = "org.apache.maven.plugins";
 
-  private static final String GOAL_ENFORCE = "enforce"; //$NON-NLS-1$
-
-  public static final String ENFORCER_PLUGIN_ARTIFACT_ID = "maven-enforcer-plugin"; //$NON-NLS-1$
-
-  public static final String ENFORCER_PLUGIN_GROUP_ID = "org.apache.maven.plugins"; //$NON-NLS-1$
-
   protected static final List<String> RELEASES;
 
   protected static final List<String> SOURCES;
@@ -112,37 +101,31 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
   protected static final LinkedHashMap<String, String> ENVIRONMENTS = new LinkedHashMap<>();
 
   static {
+    Set<String> supportedExecutionEnvironmentTypes = Set.of("JRE", "J2SE", "JavaSE");
 
-    List<String> sources = new ArrayList<>(Arrays.asList("1.1,1.2,1.3,1.4,1.5,5,1.6,6,1.7,7,1.8,8".split(","))); //$NON-NLS-1$ //$NON-NLS-2$
+    List<String> sources = new ArrayList<>();
 
-    List<String> targets = new ArrayList<>(Arrays.asList("1.1,1.2,1.3,1.4,jsr14,1.5,5,1.6,6,1.7,7,1.8,8".split(","))); //$NON-NLS-1$ //$NON-NLS-2$
-
-    List<String> releases = new ArrayList<>(Arrays.asList("6,7,8".split(","))); //$NON-NLS-1$ //$NON-NLS-2$
-
-    ENVIRONMENTS.put("1.1", "JRE-1.1"); //$NON-NLS-1$ //$NON-NLS-2$
-    ENVIRONMENTS.put("1.2", "J2SE-1.2"); //$NON-NLS-1$ //$NON-NLS-2$
-    ENVIRONMENTS.put("1.3", "J2SE-1.3"); //$NON-NLS-1$ //$NON-NLS-2$
-    ENVIRONMENTS.put("1.4", "J2SE-1.4"); //$NON-NLS-1$ //$NON-NLS-2$
-    ENVIRONMENTS.put("1.5", "J2SE-1.5"); //$NON-NLS-1$ //$NON-NLS-2$
+    List<String> targets = new ArrayList<>();
+    //Special case
+    targets.add("jsr14"); //$NON-NLS-1$
     ENVIRONMENTS.put("jsr14", "J2SE-1.5"); //$NON-NLS-1$ //$NON-NLS-2$
-    ENVIRONMENTS.put("1.6", "JavaSE-1.6"); //$NON-NLS-1$ //$NON-NLS-2$
-    ENVIRONMENTS.put("1.7", "JavaSE-1.7"); //$NON-NLS-1$ //$NON-NLS-2$
-    ENVIRONMENTS.put("1.8", "JavaSE-1.8"); //$NON-NLS-1$ //$NON-NLS-2$
 
-    for(int i = 9; i < 20; i++ ) { //Check from Java 9 to 20, because yeah, Java evolves that fast
-      String level = String.valueOf(i);
-      IExecutionEnvironment modernJavaSe = JavaRuntime.getExecutionEnvironmentsManager()
-          .getEnvironment("JavaSE-" + level);//$NON-NLS-1$
-      if(modernJavaSe == null) {
-        break;//we didn't find that level, so we bail because there's nothing after that
+    List<String> releases = new ArrayList<>(List.of("6", "7", "8"));
+
+    for(var ee : JavaRuntime.getExecutionEnvironmentsManager().getExecutionEnvironments()) {
+      var eeId = ee.getId();
+      if(supportedExecutionEnvironmentTypes.stream().filter(type -> eeId.startsWith(type)).findAny().isEmpty()) {
+        continue;
       }
-      String level1 = "1." + level;//$NON-NLS-1$
-      sources.add(level1);
-      sources.add(level);
-      targets.add(level1);
-      targets.add(level);
-      releases.add(level);
-      ENVIRONMENTS.put(level, modernJavaSe.getId());
+      var compliance = ee.getComplianceOptions().get(JavaCore.COMPILER_COMPLIANCE);
+      if(compliance != null) {
+        sources.add(compliance);
+        targets.add(compliance);
+        if(JavaCore.ENABLED.equals(ee.getComplianceOptions().get(JavaCore.COMPILER_RELEASE))) {
+          releases.add(compliance);
+        }
+        ENVIRONMENTS.put(compliance, eeId);
+      }
     }
 
     SOURCES = Collections.unmodifiableList(sources);
@@ -171,8 +154,7 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     addProjectSourceFolders(classpath, options, request, monitor);
 
     String executionEnvironmentId = getExecutionEnvironmentId(options);
-    String buildEnvironmentId = getMinimumJavaBuildEnvironmentId(request, monitor);
-    addJREClasspathContainer(classpath, buildEnvironmentId != null ? buildEnvironmentId : executionEnvironmentId);
+    addJREClasspathContainer(classpath, executionEnvironmentId);
 
     addMavenClasspathContainer(classpath);
 
@@ -318,6 +300,9 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       String mainResourcesEncoding = null;
       String testResourcesEncoding = null;
 
+      List<Boolean> isTestCompilationSkipped = new ArrayList<>();
+      List<Boolean> isTestResourcesSkipped = new ArrayList<>();
+
       List<MojoExecution> executions = getCompilerMojoExecutions(request, mon.newChild(1));
       for(MojoExecution compile : executions) {
         if(isCompileExecution(compile, mavenProject, options, monitor)) {
@@ -352,6 +337,12 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
           } catch(CoreException ex) {
             log.error("Failed to determine compiler test exclusions, assuming defaults", ex);
           }
+          try {
+            isTestCompilationSkipped
+                .add(maven.getMojoParameterValue(mavenProject, compile, "skip", Boolean.class, monitor));
+          } catch(Exception ex) {
+            isTestCompilationSkipped.add(Boolean.FALSE);
+          }
         }
       }
 
@@ -363,6 +354,12 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       for(MojoExecution resources : projectFacade.getMojoExecutions(RESOURCES_PLUGIN_GROUP_ID,
           RESOURCES_PLUGIN_ARTIFACT_ID, mon.newChild(1), GOAL_TESTRESOURCES)) {
         testResourcesEncoding = maven.getMojoParameterValue(mavenProject, resources, "encoding", String.class, monitor); //$NON-NLS-1$
+        try {
+          isTestResourcesSkipped
+              .add(maven.getMojoParameterValue(mavenProject, resources, "skip", Boolean.class, monitor));
+        } catch(Exception ex) {
+          isTestResourcesSkipped.add(Boolean.FALSE);
+        }
       }
       addSourceDirs(classpath, project, mavenProject.getCompileSourceRoots(), classes.getFullPath(), inclusion,
           exclusion, mainSourceEncoding, mon.newChild(1), false);
@@ -371,10 +368,14 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
 
       //If the project properties contain m2e.disableTestClasspathFlag=true, then the test flag must not be set
       boolean addTestFlag = !MavenClasspathHelpers.hasTestFlagDisabled(mavenProject);
-      addSourceDirs(classpath, project, mavenProject.getTestCompileSourceRoots(), testClasses.getFullPath(),
-          inclusionTest, exclusionTest, testSourceEncoding, mon.newChild(1), addTestFlag);
-      addResourceDirs(classpath, project, mavenProject, mavenProject.getBuild().getTestResources(),
-          testClasses.getFullPath(), testResourcesEncoding, mon.newChild(1), addTestFlag);
+      if(isTestCompilationSkipped.isEmpty() || !isTestCompilationSkipped.stream().allMatch(Boolean.TRUE::equals)) {
+        addSourceDirs(classpath, project, mavenProject.getTestCompileSourceRoots(), testClasses.getFullPath(),
+            inclusionTest, exclusionTest, testSourceEncoding, mon.newChild(1), addTestFlag);
+      }
+      if(isTestResourcesSkipped.isEmpty() || !isTestResourcesSkipped.stream().allMatch(Boolean.TRUE::equals)) {
+        addResourceDirs(classpath, project, mavenProject, mavenProject.getBuild().getTestResources(),
+            testClasses.getFullPath(), testResourcesEncoding, mon.newChild(1), addTestFlag);
+      }
     } finally {
       mon.done();
     }
@@ -495,47 +496,49 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
         continue;
       }
       File resourceDirectory = new File(directory);
-      if(resourceDirectory.isDirectory()) {
-        IPath relativePath = getProjectRelativePath(project, directory);
-        IResource r = project.findMember(relativePath);
-        if(r == project) {
-          /*
-           * Workaround for the Java Model Exception:
-           *   Cannot nest output folder 'xxx/src/main/resources' inside output folder 'xxx'
-           * when pom.xml have something like this:
-           *
-           * <build>
-           *   <resources>
-           *     <resource>
-           *       <directory>${basedir}</directory>
-           *       <targetPath>META-INF</targetPath>
-           *       <includes>
-           *         <include>LICENSE</include>
-           *       </includes>
-           *     </resource>
-           */
-          log.error("Skipping resource folder " + r.getFullPath());
-
-        } else if(r != null && project.equals(r.getProject())) {
-
-          IPath path = r.getFullPath();
-          IClasspathEntryDescriptor enclosing = getEnclosingEntryDescriptor(classpath, path);
-          if(enclosing != null && overlapsWithSourceFolder(path, project, mavenProject)) {
-            configureOverlapWithSource(classpath, enclosing, path);
-          } else if(overlapsWithOtherResourceFolder(path, project, mavenProject)) {
-            // skip adding resource folders that are included by other resource folders
-            log.info("Skipping resource folder " + path + " since it's contained by another resource folder");
-          } else {
-            addResourceFolder(classpath, path, outputPath, addTestFlag);
-          }
-
-          // Set folder encoding (null = platform default)
-          IFolder resourceFolder = project.getFolder(relativePath);
-          resourceFolder.setDefaultCharset(resourceEncoding, monitor);
-
+      IPath relativePath = getProjectRelativePath(project, directory);
+      IResource r = project.findMember(relativePath);
+      if(r == project) {
+        /*
+         * Workaround for the Java Model Exception:
+         *   Cannot nest output folder 'xxx/src/main/resources' inside output folder 'xxx'
+         * when pom.xml have something like this:
+         *
+         * <build>
+         *   <resources>
+         *     <resource>
+         *       <directory>${basedir}</directory>
+         *       <targetPath>META-INF</targetPath>
+         *       <includes>
+         *         <include>LICENSE</include>
+         *       </includes>
+         *     </resource>
+         */
+        log.error("Skipping resource folder " + r.getFullPath());
+        return;
+      }
+      if(r == null) {
+        //this means the resources does not exits (yet) but might be created later on!
+        r = project.getFolder(relativePath);
+      }
+      if(project.equals(r.getProject())) {
+        IPath path = r.getFullPath();
+        IClasspathEntryDescriptor enclosing = getEnclosingEntryDescriptor(classpath, path);
+        if(enclosing != null && overlapsWithSourceFolder(path, project, mavenProject)) {
+          configureOverlapWithSource(classpath, enclosing, path);
+        } else if(overlapsWithOtherResourceFolder(path, project, mavenProject)) {
+          // skip adding resource folders that are included by other resource folders
+          log.info("Skipping resource folder " + path + " since it's contained by another resource folder");
         } else {
-          log.info("Not adding resources folder " + resourceDirectory.getAbsolutePath());
+          addResourceFolder(classpath, path, outputPath, addTestFlag);
         }
+        // Set folder encoding (null = platform default)
+        IFolder resourceFolder = project.getFolder(relativePath);
+        if(resourceFolder.exists()) {
+          resourceFolder.setDefaultCharset(resourceEncoding, monitor);
+        }
+      } else {
+        log.info("Not adding resources folder " + resourceDirectory.getAbsolutePath());
       }
     }
   }
@@ -546,6 +549,7 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     IClasspathEntryDescriptor descriptor = classpath.addSourceEntry(resourceFolder, outputPath, DEFAULT_INCLUSIONS,
         new IPath[] {new Path("**")}, false /*optional*/);
     descriptor.setClasspathAttribute(IClasspathManager.TEST_ATTRIBUTE, addTestFlag ? "true" : null);
+    descriptor.setClasspathAttribute(IClasspathAttribute.OPTIONAL, "true"); //$NON-NLS-1$
   }
 
   private void configureOverlapWithSource(IClasspathDescriptor classpath, IClasspathEntryDescriptor enclosing,
@@ -647,9 +651,7 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       }
     }
 
-    if(release != null)
-
-    {
+    if(release != null) {
       source = release;
       target = release;
     } else {
@@ -664,11 +666,6 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       }
 
     }
-
-    // While "5" and "6" ... are valid synonyms for Java 5, Java 6 ... source/target,
-    // Eclipse expects the values 1.5 and 1.6 and so on.
-    source = sanitizeJavaVersion(source);
-    target = sanitizeJavaVersion(target);
 
     options.put(JavaCore.COMPILER_SOURCE, source);
     options.put(JavaCore.COMPILER_COMPLIANCE, source);
@@ -766,6 +763,9 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
   }
 
   private String sanitizeJavaVersion(String version) {
+    if(version == null) {
+      return null;
+    }
     return switch(version) {
       case "5", "6", "7", "8" -> "1." + version;
       default -> {
@@ -794,127 +794,38 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
         monitor, GOAL_COMPILE, GOAL_TESTCOMPILE);
   }
 
-  protected List<MojoExecution> getEnforcerMojoExecutions(ProjectConfigurationRequest request, IProgressMonitor monitor)
-      throws CoreException {
-    return request.mavenProjectFacade().getMojoExecutions(ENFORCER_PLUGIN_GROUP_ID, ENFORCER_PLUGIN_ARTIFACT_ID,
-        monitor, GOAL_ENFORCE);
-  }
-
-  private String getCompilerLevel(MavenProject mavenProject, MojoExecution execution, String parameter, String source,
-      List<String> levels, IProgressMonitor monitor) {
-    int levelIdx = getLevelIndex(source, levels);
-
+  private String getCompilerLevel(MavenProject mavenProject, MojoExecution execution, String parameter,
+      String prevVersion, List<String> supportedVersions, IProgressMonitor monitor) {
     try {
-      source = maven.getMojoParameterValue(mavenProject, execution, parameter, String.class, monitor);
+      String version = maven.getMojoParameterValue(mavenProject, execution, parameter, String.class, monitor);
+      if(version == null) {
+        return prevVersion;
+      }
+      if(!"release".equals(parameter)) {
+        // While "5" and "6" ... are valid synonyms for Java 5, Java 6 ... source/target,
+        // Eclipse expects the values 1.5 and 1.6 and so on.
+        version = sanitizeJavaVersion(version);
+      }
+      if(!supportedVersions.isEmpty() && !supportedVersions.contains(version)) {
+        // supported versions are sorted, so last === highest
+        String highestVersion = supportedVersions.get(supportedVersions.size() - 1);
+        try {
+          if(Version.valueOf(highestVersion).compareTo(Version.valueOf(version)) < 0) {
+            // project (javac) version is probably not yet supported by JDT, 
+            // so return the highest available version available at that time
+            return highestVersion;
+          }
+        } catch(Exception malformedVersion) {
+          //Ignore malformed version
+        }
+        return prevVersion;
+      }
+      return JavaCore.compareJavaVersions(prevVersion, version) < 0 ? version : prevVersion;
+
     } catch(CoreException ex) {
       log.error("Failed to determine compiler " + parameter + " setting, assuming default", ex);
     }
-
-    int newLevelIdx = getLevelIndex(source, levels);
-
-    if(newLevelIdx > levelIdx) {
-      levelIdx = newLevelIdx;
-    }
-
-    if(levelIdx < 0) {
-      return null;
-    }
-
-    return levels.get(levelIdx);
-  }
-
-  private int getLevelIndex(String level, List<String> levels) {
-    int idx = -1;
-    if(level != null) {
-      idx = levels.indexOf(level);
-      if(idx < 0) {
-        //JDK level probably not yet supported by JDT
-        int highestIdx = levels.size() - 1;
-        try {
-          if(asDouble(level) > asDouble(levels.get(highestIdx))) {
-            //take highest known value
-            idx = highestIdx;
-          }
-        } catch(NumberFormatException ignore) {
-        }
-      }
-    }
-    return idx;
-  }
-
-  private String getMinimumJavaBuildEnvironmentId(ProjectConfigurationRequest request, IProgressMonitor monitor) {
-    try {
-      List<MojoExecution> mojoExecutions = getEnforcerMojoExecutions(request, monitor);
-      for(MojoExecution mojoExecution : mojoExecutions) {
-        String version = getMinimumJavaBuildEnvironmentId(request.mavenProject(), mojoExecution, monitor);
-        if(version != null) {
-          return version;
-        }
-      }
-    } catch(CoreException | InvalidVersionSpecificationException ex) {
-      log.error("Failed to determine minimum build Java version, assuming default", ex);
-    }
-    return null;
-  }
-
-  private String getMinimumJavaBuildEnvironmentId(MavenProject mavenProject, MojoExecution mojoExecution,
-      IProgressMonitor monitor) throws InvalidVersionSpecificationException, CoreException {
-    // https://maven.apache.org/enforcer/enforcer-rules/requireJavaVersion.html
-    String version = ((MavenImpl) maven).getMojoParameterValue(mavenProject, mojoExecution,
-        List.of("rules", "requireJavaVersion", "version"), String.class, monitor);
-    if(version == null) {
-      return null;
-    }
-    return getMinimumJavaBuildEnvironmentId(version);
-  }
-
-  private String getMinimumJavaBuildEnvironmentId(String versionSpec) throws InvalidVersionSpecificationException {
-    VersionRange vr = VersionRange.createFromVersionSpec(versionSpec);
-    ArtifactVersion recommendedVersion = vr.getRecommendedVersion();
-    List<Restriction> versionRestrictions = List.of();
-    if(recommendedVersion == null) {
-      versionRestrictions = getVersionRangeRestrictionsIgnoringMicroAndQualifier(vr);
-    } else {
-      // only consider major and minor version here, micro and qualifier not relevant inside IDE (probably)
-      recommendedVersion = getMajorMinorOnlyVersion(recommendedVersion);
-    }
-    // find lowest matching environment id
-    for(Entry<String, String> entry : ENVIRONMENTS.entrySet()) {
-      ArtifactVersion environmentVersion = new DefaultArtifactVersion(entry.getKey());
-      boolean foundMatchingVersion;
-      if(recommendedVersion == null) {
-        foundMatchingVersion = versionRestrictions.stream().anyMatch(r -> r.containsVersion(environmentVersion));
-      } else {
-        // only singular versions ever have a recommendedVersion
-        int compareTo = recommendedVersion.compareTo(environmentVersion);
-        foundMatchingVersion = compareTo <= 0;
-      }
-      if(foundMatchingVersion) {
-        return entry.getValue();
-      }
-    }
-    return null;
-  }
-
-  private static List<Restriction> getVersionRangeRestrictionsIgnoringMicroAndQualifier(VersionRange versionRange) {
-    return versionRange.getRestrictions().stream().map(restriction -> {
-      ArtifactVersion lowerBound = restriction.getLowerBound();
-      ArtifactVersion upperBound = restriction.getUpperBound();
-      return new Restriction(// 
-          lowerBound != null ? getMajorMinorOnlyVersion(lowerBound) : null, restriction.isLowerBoundInclusive(),
-          upperBound != null ? getMajorMinorOnlyVersion(upperBound) : null, restriction.isUpperBoundInclusive());
-    }).toList();
-  }
-
-  private static ArtifactVersion getMajorMinorOnlyVersion(ArtifactVersion lower) {
-    return new DefaultArtifactVersion(lower.getMajorVersion() + "." + lower.getMinorVersion());
-  }
-
-  private double asDouble(String level) {
-    if(level == null || level.isEmpty()) {
-      return -1;
-    }
-    return Double.parseDouble(sanitizeJavaVersion(level));
+    return prevVersion;
   }
 
   @Override

@@ -1,14 +1,14 @@
 /*******************************************************************************
- * Copyright (c) 2021 Christoph Läubrich
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v2.0
- * which accompanies this distribution, and is available at
- * https://www.eclipse.org/legal/epl-v20.html
+ * Copyright (c) 2021, 2023 Christoph Läubrich and others
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0.
  *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *      Christoph Läubrich - initial API and implementation
+ *   Christoph Läubrich - initial API and implementation
  *******************************************************************************/
 package org.eclipse.m2e.pde.ui.target.editor;
 
@@ -32,7 +32,6 @@ import org.eclipse.jface.viewers.TableViewerColumn;
 import org.eclipse.jface.viewers.TextCellEditor;
 import org.eclipse.m2e.pde.target.MavenTargetRepository;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.layout.GridData;
@@ -69,21 +68,11 @@ public class MavenTargetRepositoryEditor extends Dialog {
 	protected void createButtonsForButtonBar(Composite parent) {
 		Button button = createButton(parent, IDialogConstants.CLIENT_ID + 1, Messages.MavenTargetRepositoryEditor_1,
 				false);
-		button.addSelectionListener(new SelectionListener() {
-
-			int counter = 1;
-
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				editList.add(new MavenTargetRepository("Id" + (counter++), "https://"));
-				tableViewer.refresh();
-			}
-
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-
-			}
-		});
+		int[] counter = new int[] { 1 };
+		button.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> {
+			editList.add(new MavenTargetRepository("Id" + (counter[0]++), "https://"));
+			tableViewer.refresh();
+		}));
 		super.createButtonsForButtonBar(parent);
 	}
 
@@ -115,12 +104,8 @@ public class MavenTargetRepositoryEditor extends Dialog {
 			TableViewerColumn column = new TableViewerColumn(tableViewer, SWT.NONE);
 			column.getColumn().setText("Id");
 			column.getColumn().setWidth(150);
-			column.setLabelProvider(new ColumnLabelProvider() {
-				@Override
-				public String getText(Object element) {
-					return ((MavenTargetRepository) element).getId();
-				}
-			});
+			column.setLabelProvider(
+					ColumnLabelProvider.createTextProvider(element -> ((MavenTargetRepository) element).getId()));
 			column.setEditingSupport(
 					new TextEditingSupport(tableViewer, MavenTargetRepository::getId, MavenTargetRepository::setId));
 		}
@@ -128,12 +113,9 @@ public class MavenTargetRepositoryEditor extends Dialog {
 			TableViewerColumn column = new TableViewerColumn(tableViewer, SWT.NONE);
 			column.getColumn().setText("URL");
 			column.getColumn().setWidth(300);
-			column.setLabelProvider(new ColumnLabelProvider() {
-				@Override
-				public String getText(Object element) {
-					return ((MavenTargetRepository) element).getUrl();
-				}
-			});
+			column.setLabelProvider(
+					ColumnLabelProvider.createTextProvider(element -> ((MavenTargetRepository) element).getUrl()
+			));
 			column.setEditingSupport(
 					new TextEditingSupport(tableViewer, MavenTargetRepository::getUrl, MavenTargetRepository::setUrl));
 		}

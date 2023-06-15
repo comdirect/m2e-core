@@ -33,6 +33,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -58,6 +59,7 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.MultiStatus;
 import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.Path;
@@ -95,14 +97,13 @@ import org.eclipse.m2e.core.internal.IMavenToolbox;
 import org.eclipse.m2e.core.internal.Messages;
 import org.eclipse.m2e.core.internal.URLConnectionCaches;
 import org.eclipse.m2e.core.internal.embedder.MavenExecutionContext;
+import org.eclipse.m2e.core.internal.embedder.MavenProperties;
 import org.eclipse.m2e.core.internal.embedder.PlexusContainerManager;
 import org.eclipse.m2e.core.internal.lifecyclemapping.LifecycleMappingFactory;
 import org.eclipse.m2e.core.internal.lifecyclemapping.LifecycleMappingResult;
 import org.eclipse.m2e.core.internal.lifecyclemapping.model.PluginExecutionMetadata;
 import org.eclipse.m2e.core.internal.markers.IMavenMarkerManager;
 import org.eclipse.m2e.core.internal.markers.MarkerUtils;
-import org.eclipse.m2e.core.internal.project.DependencyResolutionContext;
-import org.eclipse.m2e.core.internal.project.ProjectProcessingTracker;
 import org.eclipse.m2e.core.internal.project.ResolverConfigurationIO;
 import org.eclipse.m2e.core.lifecyclemapping.model.IPluginExecutionMetadata;
 import org.eclipse.m2e.core.project.IMavenProjectChangedListener;
@@ -304,22 +305,23 @@ public class ProjectRegistryManager implements ISaveParticipant {
    *
    * @since 1.4
    */
-  public void refresh(Collection<IFile> pomFiles, IProgressMonitor monitor) throws CoreException {
+  public Map<IFile, IStatus> refresh(Collection<IFile> pomFiles, IProgressMonitor monitor) throws CoreException {
     SubMonitor progress = SubMonitor.convert(monitor, Messages.ProjectRegistryManager_task_refreshing, 100);
     ISchedulingRule rule = ResourcesPlugin.getWorkspace().getRoot();
     Job.getJobManager().beginRule(rule, progress);
     syncRefreshThread = Thread.currentThread();
     try (MutableProjectRegistry newState = newMutableProjectRegistry()) {
-      refresh(newState, pomFiles, progress.newChild(95));
+      Map<IFile, IStatus> result = refresh(newState, pomFiles, progress.newChild(95));
 
       applyMutableProjectRegistry(newState, progress.newChild(5));
+      return result;
     } finally {
       syncRefreshThread = null;
       Job.getJobManager().endRule(rule);
     }
   }
 
-  void refresh(MutableProjectRegistry newState, Collection<IFile> pomFiles, IProgressMonitor monitor)
+  Map<IFile, IStatus> refresh(MutableProjectRegistry newState, Collection<IFile> pomFiles, IProgressMonitor monitor)
       throws CoreException {
     long start = System.currentTimeMillis();
     log.debug("Refreshing ({} files): {}", pomFiles.size(), pomFiles); //$NON-NLS-1$
@@ -358,14 +360,21 @@ public class ProjectRegistryManager implements ISaveParticipant {
     maven.addLocalRepositoryListener(listener);
     try {
       refresh(newState, context, monitor);
+      Map<IFile, IStatus> statusResult = new ConcurrentHashMap<>();
+      for(IFile file : pomFiles) {
+        statusResult.put(file, context.getStatus(file));
+      }
+      return statusResult;
     } finally {
       maven.removeLocalRepositoryListener(listener);
+      log.debug("Refresh takes {} ms", (System.currentTimeMillis() - start)); //$NON-NLS-1$
     }
-    log.debug("Refresh takes {} ms", (System.currentTimeMillis() - start)); //$NON-NLS-1$
   }
 
-  private void refresh(MutableProjectRegistry newState, DependencyResolutionContext context, IProgressMonitor monitor)
+  private void refresh(MutableProjectRegistry newState, DependencyResolutionContext context,
+      IProgressMonitor monitor)
       throws CoreException {
+
     Set<IFile> allProcessedPoms = new LinkedHashSet<>();
     Set<IFile> allNewFacades = new HashSet<>();
 
@@ -377,7 +386,8 @@ public class ProjectRegistryManager implements ISaveParticipant {
       List<IFile> pomsForUpdate = calculateFacadesForUpdate(newState, context, allProcessedPoms::add,
           allNewFacades::contains,
           monitor);
-      Map<IFile, MavenProjectFacade> newFacades = readMavenProjectFacades(pomsForUpdate, newState, monitor);
+      context.clearErrors(pomsForUpdate);
+      Map<IFile, MavenProjectFacade> newFacades = readMavenProjectFacades(pomsForUpdate, newState, context, monitor);
       for(Entry<IFile, MavenProjectFacade> entry : newFacades.entrySet()) {
         IFile pom = entry.getKey();
         MavenProjectFacade newFacade = entry.getValue();
@@ -421,7 +431,8 @@ public class ProjectRegistryManager implements ISaveParticipant {
         // This can help if some read files are parent of other ones in the same
         // request -> the child wouldn't be read immediately, but would be in a
         // 2nd pass once parent was read.
-        context.forcePomFiles(new HashSet<>(erroneousPoms));
+        HashSet<IFile> pomFiles = new HashSet<>(erroneousPoms);
+        context.forcePomFiles(pomFiles);
       }
     }
 
@@ -450,7 +461,7 @@ public class ProjectRegistryManager implements ISaveParticipant {
             MavenProject mavenProject = getMavenProject(newFacade);
             if(!allProcessedPoms.contains(newFacade.getPom())) {
               // facade from workspace state that has not been refreshed yet
-              newFacade = readMavenProjectFacades(Collections.singletonList(pom), newState, monitor).get(pom);
+              newFacade = readMavenProjectFacades(Collections.singletonList(pom), newState, context, monitor).get(pom);
             } else {
               // recreate facade instance to trigger project changed event
               // this is only necessary for facades that are refreshed because their dependencies changed
@@ -649,10 +660,12 @@ public class ProjectRegistryManager implements ISaveParticipant {
       if(executions != null) {
         ListIterator<IPluginExecutionMetadata> iterator = executions.listIterator();
         while(iterator.hasNext()) {
-          PluginExecutionMetadata execution = (PluginExecutionMetadata) iterator.next();
-          execution = execution.clone();
-          execution.setSource(null);
-          iterator.set(execution);
+          IPluginExecutionMetadata metadata = iterator.next();
+          if(metadata instanceof PluginExecutionMetadata execution) {
+            execution = execution.clone();
+            execution.setSource(null);
+            iterator.set(execution);
+          }
         }
       }
     }
@@ -714,7 +727,7 @@ public class ProjectRegistryManager implements ISaveParticipant {
   }
 
   private Map<IFile, MavenProjectFacade> readMavenProjectFacades(Collection<IFile> poms, MutableProjectRegistry state,
-      IProgressMonitor monitor) throws CoreException {
+      DependencyResolutionContext resolutionContext, IProgressMonitor monitor) throws CoreException {
     if(poms.isEmpty()) {
       return Collections.emptyMap();
     }
@@ -741,6 +754,7 @@ public class ProjectRegistryManager implements ISaveParticipant {
           null);
       configureExecutionRequest(context.getExecutionRequest(), state,
           fileList.size() == 1 ? fileList.iterator().next() : null, resolverConfiguration);
+      try {
       context.execute((ctx, mon) -> {
         Map<IFile, File> pomFiles = fileList.stream().filter(IFile::isAccessible)
             .collect(Collectors.toMap(Function.identity(), ProjectRegistryManager::toJavaIoFile));
@@ -771,6 +785,11 @@ public class ProjectRegistryManager implements ISaveParticipant {
         }
         return facades;
       }, subMonitor.split(1));
+      } catch(CoreException e) {
+        for(IFile file : fileList) {
+          resolutionContext.setStatus(file, e.getStatus());
+        }
+      }
     }
     return result;
   }
@@ -923,14 +942,14 @@ public class ProjectRegistryManager implements ISaveParticipant {
     request.addInactiveProfiles(resolverConfiguration.getInactiveProfileList());
 
     Properties userProperties = request.getUserProperties();
+    //User properties (from maven.config or alike) first
+    userProperties.putAll(resolverConfiguration.getUserProperties());
+    //then use explicit project configuration to overrule anything else...
     Map<String, String> addProperties = resolverConfiguration.getConfigurationProperties();
-    if(addProperties != null) {
-      if(userProperties == null) {
-        userProperties = new Properties();
-        //FIXME should we not set them here?? request.setUserProperties(p);
-      }
+    if(addProperties != null && !addProperties.isEmpty()) {
       userProperties.putAll(addProperties);
     }
+
 
     // eclipse workspace repository implements both workspace dependency resolution
     // and inter-module dependency resolution for multi-module projects.
@@ -939,7 +958,7 @@ public class ProjectRegistryManager implements ISaveParticipant {
     request.setWorkspaceReader(getWorkspaceReader(state, pom, resolverConfiguration));
     if(pom != null && pom.getLocation() != null) {
       request.setMultiModuleProjectDirectory(
-          PlexusContainerManager.computeMultiModuleProjectDirectory(pom.getLocation().toFile()));
+          MavenProperties.computeMultiModuleProjectDirectory(pom.getLocation().toFile()));
     }
 
     return request;
@@ -979,7 +998,7 @@ public class ProjectRegistryManager implements ISaveParticipant {
    * @throws StaleMutableProjectRegistryException if primary project registry was modified after mutable registry has
    *           been created
    */
-  void applyMutableProjectRegistry(MutableProjectRegistry newState, IProgressMonitor monitor) throws CoreException {
+  void applyMutableProjectRegistry(MutableProjectRegistry newState, IProgressMonitor monitor) {
     List<MavenProjectChangedEvent> events = projectRegistry.apply(newState);
     //stateReader.writeWorkspaceState(projectRegistry);
     notifyProjectChangeListeners(events, monitor);
@@ -1015,7 +1034,7 @@ public class ProjectRegistryManager implements ISaveParticipant {
         context = new MavenExecutionContext(containerManager.aquire(pom).getComponentLookup(), basedir, null);
       }
     } catch(Exception ex) {
-      throw new CoreException(Status.error("aquire container failed", ex));
+      throw new CoreException(Status.error("Acquire container failed", ex));
     }
     configureExecutionRequest(context.getExecutionRequest(), state, pom, resolverConfiguration);
     return context;

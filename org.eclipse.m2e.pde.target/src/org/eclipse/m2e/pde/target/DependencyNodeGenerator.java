@@ -1,14 +1,14 @@
 /*******************************************************************************
- * Copyright (c) 2018, 2022 Christoph Läubrich
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v2.0
- * which accompanies this distribution, and is available at
- * https://www.eclipse.org/legal/epl-v20.html
+ * Copyright (c) 2018, 2023 Christoph Läubrich and others
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0.
  *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *      Christoph Läubrich - initial API and implementation
+ *   Christoph Läubrich - initial API and implementation
  *******************************************************************************/
 package org.eclipse.m2e.pde.target;
 
@@ -32,44 +32,28 @@ import org.eclipse.m2e.core.embedder.ICallable;
 import org.eclipse.m2e.core.embedder.IMavenExecutionContext;
 import org.eclipse.m2e.core.internal.MavenPluginActivator;
 
-@SuppressWarnings("restriction")
-final class DependencyNodeGenerator implements ICallable<PreorderNodeListGenerator> {
-		private final Artifact artifact;
-		private final List<ArtifactRepository> repositories;
-		private final MavenTargetDependency root;
-		private Collection<String> dependencyScopes;
-		private MavenTargetLocation parent;
-		private DependencyDepth dependencyDepth;
+final class DependencyNodeGenerator {
+	private DependencyNodeGenerator() {
+	}
 
-		DependencyNodeGenerator(MavenTargetDependency root, Artifact artifact, DependencyDepth dependencyDepth,
-				Collection<String> dependencyScopes, List<ArtifactRepository> repositories,
-				MavenTargetLocation parent) {
-			this.artifact = artifact;
-			this.dependencyDepth = dependencyDepth;
-			this.repositories = repositories;
-			this.root = root;
-			this.dependencyScopes = dependencyScopes;
-			this.parent = parent;
-		}
+	static ICallable<PreorderNodeListGenerator> create(MavenTargetDependency root, Artifact artifact,
+			DependencyDepth dependencyDepth, Collection<String> dependencyScopes, List<ArtifactRepository> repositories,
+			MavenTargetLocation parent) {
 
-
-		@Override
-		public PreorderNodeListGenerator call(IMavenExecutionContext context, IProgressMonitor monitor)
-				throws CoreException {
+		return (IMavenExecutionContext context, IProgressMonitor monitor) -> {
 			try {
 				CollectRequest collectRequest = new CollectRequest();
 				collectRequest.setRoot(new Dependency(artifact, null));
 				collectRequest.setRepositories(RepositoryUtils.toRepos(repositories));
 
 				RepositorySystem repoSystem = MavenPluginActivator.getDefault().getRepositorySystem();
-				DependencyNode node = repoSystem
-						.collectDependencies(context.getRepositorySession(), collectRequest).getRoot();
+				DependencyNode node = repoSystem.collectDependencies(context.getRepositorySession(), collectRequest)
+						.getRoot();
 				node.setData(MavenTargetLocation.DEPENDENCYNODE_PARENT, parent);
 				node.setData(MavenTargetLocation.DEPENDENCYNODE_ROOT, root);
 				DependencyRequest dependencyRequest = new DependencyRequest();
 				dependencyRequest.setRoot(node);
-				dependencyRequest
-						.setFilter(new MavenTargetDependencyFilter(dependencyDepth, dependencyScopes));
+				dependencyRequest.setFilter(new MavenTargetDependencyFilter(dependencyDepth, dependencyScopes));
 				repoSystem.resolveDependencies(context.getRepositorySession(), dependencyRequest);
 				PreorderNodeListGenerator nlg = new PreorderNodeListGenerator();
 				node.accept(nlg);
@@ -79,5 +63,6 @@ final class DependencyNodeGenerator implements ICallable<PreorderNodeListGenerat
 			} catch (RuntimeException e) {
 				throw new CoreException(Status.error("Internal error", e));
 			}
-		}
+		};
 	}
+}

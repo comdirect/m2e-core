@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008-2010 Sonatype, Inc.
+ * Copyright (c) 2008-2023 Sonatype, Inc.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -36,6 +36,8 @@ import org.apache.maven.wagon.resource.Resource;
  */
 public class FilexWagon extends FileWagon {
 
+  static final String PROTOCOL = "filex";
+
   private static List<String> requests = new ArrayList<>();
 
   private static String requestFilterPattern;
@@ -57,39 +59,33 @@ public class FilexWagon extends FileWagon {
     requestFailPattern = regex;
   }
 
+  @Override
   public void connect(Repository repository, AuthenticationInfo authenticationInfo, ProxyInfoProvider proxyInfoProvider)
       throws ConnectionException, AuthenticationException {
     String basedir = repository.getBasedir();
     if(basedir != null && basedir.startsWith("/")) {
       repository.setBasedir(basedir.substring(1));
     }
-
     super.connect(repository, authenticationInfo, proxyInfoProvider);
   }
 
+  @Override
   public void fillInputData(InputData inputData) throws TransferFailedException, ResourceDoesNotExistException {
-    record("GET", inputData.getResource());
-    fail(inputData.getResource());
-
+    recordOperation("GET", inputData.getResource());
     super.fillInputData(inputData);
   }
 
+  @Override
   public void fillOutputData(OutputData outputData) throws TransferFailedException {
-    record("PUT", outputData.getResource());
-    fail(outputData.getResource());
-
+    recordOperation("PUT", outputData.getResource());
     super.fillOutputData(outputData);
   }
 
-  private static void record(String op, Resource resource) {
+  private static void recordOperation(String op, Resource resource) throws TransferFailedException {
     String name = resource.getName();
     if(requestFilterPattern == null || name.matches(requestFilterPattern)) {
       requests.add(op + " " + name);
     }
-  }
-
-  private static void fail(Resource resource) throws TransferFailedException {
-    String name = resource.getName();
     if(requestFailPattern != null && name.matches(requestFailPattern)) {
       throw new TransferFailedException("Test failure");
     }

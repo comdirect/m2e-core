@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2011-2016 Igor Fedorenko
+ * Copyright (c) 2011-2023 Igor Fedorenko
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -14,9 +14,9 @@ package org.eclipse.m2e.sourcelookup.internal.launch;
 
 import java.io.File;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.debug.core.sourcelookup.ISourceContainer;
@@ -26,46 +26,39 @@ import org.eclipse.jdt.launching.sourcelookup.advanced.ISourceContainerResolver;
 import org.eclipse.jdt.launching.sourcelookup.containers.JavaProjectSourceContainer;
 import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.embedder.ArtifactKey;
+import org.eclipse.m2e.core.internal.MavenArtifactIdentifier;
 import org.eclipse.m2e.core.project.IMavenProjectFacade;
 import org.eclipse.m2e.core.project.IMavenProjectRegistry;
-import org.eclipse.m2e.sourcelookup.internal.MavenArtifactIdentifier;
-
 
 public class MavenSourceContainerResolver implements ISourceContainerResolver {
 
-  @Override
-  public Collection<ISourceContainer> resolveSourceContainers(File classesLocation, IProgressMonitor monitor) {
-    Collection<ArtifactKey> classesArtifacts = MavenArtifactIdentifier.identify(classesLocation);
+	@Override
+	public Collection<ISourceContainer> resolveSourceContainers(File classesLocation, IProgressMonitor monitor) {
+		Collection<ArtifactKey> classesArtifacts = MavenArtifactIdentifier.identify(classesLocation);
 
-    if (classesArtifacts.isEmpty()) {
-      return List.of();
-    }
+		if (classesArtifacts.isEmpty()) {
+			return List.of();
+		}
+		return classesArtifacts.stream()//
+				.map(classesArtifact -> resolveSourceContainer(classesArtifact, monitor))//
+				.filter(Objects::nonNull).toList();
+	}
 
-    List<ISourceContainer> result = new ArrayList<>();
-    for (ArtifactKey classesArtifact : classesArtifacts) {
-      ISourceContainer container = resolveSourceContainer(classesArtifact, monitor);
-      if (container != null) {
-        result.add(container);
-      }
-    }
-    return result;
-  }
+	protected ISourceContainer resolveSourceContainer(ArtifactKey artifact, IProgressMonitor monitor) {
+		String groupId = artifact.groupId();
+		String artifactId = artifact.artifactId();
+		String version = artifact.version();
 
-  protected ISourceContainer resolveSourceContainer(ArtifactKey artifact, IProgressMonitor monitor) {
-    String groupId = artifact.groupId();
-    String artifactId = artifact.artifactId();
-    String version = artifact.version();
+		IMavenProjectRegistry projectRegistry = MavenPlugin.getMavenProjectRegistry();
 
-    IMavenProjectRegistry projectRegistry = MavenPlugin.getMavenProjectRegistry();
-
-    IMavenProjectFacade mavenProject = projectRegistry.getMavenProject(groupId, artifactId, version);
-    if (mavenProject != null) {
-      return new JavaProjectSourceContainer(JavaCore.create(mavenProject.getProject()));
-    }
-    Path sourceLocation = MavenArtifactIdentifier.resolveSourceLocation(artifact, monitor);
-    if (sourceLocation != null) {
-      return new ExternalArchiveSourceContainer(sourceLocation.toString(), true);
-    }
-    return null;
-  }
+		IMavenProjectFacade mavenProject = projectRegistry.getMavenProject(groupId, artifactId, version);
+		if (mavenProject != null) {
+			return new JavaProjectSourceContainer(JavaCore.create(mavenProject.getProject()));
+		}
+		Path sourceLocation = MavenArtifactIdentifier.resolveSourceLocation(artifact, monitor);
+		if (sourceLocation != null) {
+			return new ExternalArchiveSourceContainer(sourceLocation.toString(), true);
+		}
+		return null;
+	}
 }

@@ -100,7 +100,7 @@ public class MavenProjectWizard extends AbstractMavenProjectWizard implements IN
    */
   public MavenProjectWizard() {
     setWindowTitle(Messages.wizardProjectTitle);
-    setDefaultPageImageDescriptor(MavenImages.WIZ_NEW_PROJECT);
+    setDefaultPageImageDescriptor(MavenImages.WIZ_NEW_MAVEN_PROJECT);
     setNeedsProgressMonitor(true);
   }
 
@@ -264,7 +264,7 @@ public class MavenProjectWizard extends AbstractMavenProjectWizard implements IN
               NLS.bind(Messages.wizardProjectJobFailed, projectName), result.getMessage()));
         }
 
-        MappingDiscoveryJob discoveryJob = new MappingDiscoveryJob(job.getCreatedProjects());
+        MappingDiscoveryJob discoveryJob = new MappingDiscoveryJob(job.getCreatedProjects(), true);
         discoveryJob.schedule();
 
       }

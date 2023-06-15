@@ -1,14 +1,14 @@
 /*******************************************************************************
- * Copyright (c) 2021 Christoph Läubrich
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v2.0
- * which accompanies this distribution, and is available at
- * https://www.eclipse.org/legal/epl-v20.html
+ * Copyright (c) 2021, 2023 Christoph Läubrich and others
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0.
  *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *      Christoph Läubrich - initial API and implementation
+ *   Christoph Läubrich - initial API and implementation
  *******************************************************************************/
 package org.eclipse.m2e.pde.target;
 
@@ -38,7 +38,6 @@ public final class TemplateFeatureModel extends AbstractFeatureModel {
 			StringWriter stringWriter = new StringWriter();
 			try (PrintWriter writer = new PrintWriter(stringWriter)) {
 				template.write("", writer);
-				writer.flush();
 			}
 			this.xml = stringWriter.toString();
 		}
