@@ -28,7 +28,7 @@
 		<rcptt-maven-version>2.5.4</rcptt-maven-version>
 		<tychoDefaultTestArgLine>-Xmx800m</tychoDefaultTestArgLine>
 		<tycho.testArgLine>${tychoDefaultTestArgLine}</tycho.testArgLine>
-		<tycho.surefire.timeout>900</tycho.surefire.timeout>
+		<surefire.timeout>900</surefire.timeout>
 		<tycho.surefire.useUIHarness>true</tycho.surefire.useUIHarness>
 		<tycho.surefire.useUIThread>true</tycho.surefire.useUIThread>
 		<jacoco.destFile>../target/jacoco.exec</jacoco.destFile>
@@ -40,7 +40,7 @@
 	<modules>
 		<module>target-platform</module>
 
-		<module>m2e-maven-runtime</module>
+		<module>org.eclipse.m2e.maven.runtime</module>
 
 		<module>org.eclipse.m2e.model.edit</module>
 		<module>org.eclipse.m2e.core</module>
@@ -104,13 +104,8 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.eclipse.m2e</groupId>
-			<artifactId>org.eclipse.m2e.archetype.common</artifactId>
-			<version>3.2.103-SNAPSHOT</version>
-		</dependency>
-		<dependency>
-			<groupId>org.eclipse.m2e</groupId>
 			<artifactId>org.eclipse.m2e.maven.runtime</artifactId>
-			<version>3.9.100-SNAPSHOT</version>
+			<version>3.9.400-SNAPSHOT</version>
 		</dependency>
 	</dependencies>
 
@@ -190,19 +185,6 @@
 							</configuration>
 						</execution>
 					</executions>
-				</plugin>
-				<plugin>
-					<groupId>org.eclipse.tycho</groupId>
-					<artifactId>tycho-surefire-plugin</artifactId>
-					<version>${tycho-version}</version>
-					<configuration>
-						<useUIHarness>${tycho.surefire.useUIHarness}</useUIHarness>
-						<useUIThread>${tycho.surefire.useUIThread}</useUIThread>
-						<includes>
-							<include>**/*Test.java</include>
-						</includes>
-						<forkedProcessTimeoutInSeconds>${tycho.surefire.timeout}</forkedProcessTimeoutInSeconds>
-					</configuration>
 				</plugin>
 				<plugin>
 					<groupId>org.eclipse.tycho</groupId>

@@ -35,6 +35,7 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.ILog;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.Path;
@@ -244,14 +245,17 @@ public class MavenLaunchDelegate extends JavaLaunchDelegate implements MavenLaun
     try {
       Optional<IContainer> container = getContainer(pomDirectory);
       if(container.isPresent()) {
-        IMavenProjectRegistry projectManager = MavenPlugin.getMavenProjectRegistry();
-        IFile pomFile = container.get().getFile(Path.fromOSString(IMavenConstants.POM_FILE_NAME));
-        IMavenProjectFacade mavenProject = projectManager.create(pomFile, true, new NullProgressMonitor());
-        if(mavenProject != null) {
-          return readEnforcedVersion(mavenProject, monitor);
+        IPath pomPath = Path.fromOSString(IMavenConstants.POM_FILE_NAME);
+        if(container.get().exists(pomPath)) {
+          IFile pomFile = container.get().getFile(pomPath);
+          IMavenProjectRegistry projectManager = MavenPlugin.getMavenProjectRegistry();
+          IMavenProjectFacade mavenProject = projectManager.create(pomFile, true, new NullProgressMonitor());
+          if(mavenProject != null) {
+            return readEnforcedVersion(mavenProject, monitor);
+          }
         }
       }
-      //TODO: handle the case if the pomDirectory points to a project not in the project. Then load the bare project.
+      //TODO: handle the case if the pomDirectory points to a project not in the workspace. Then load the bare project.
     } catch(CoreException ex) {
       logEnforcedJavaVersionCalculationError(ex);
     }
@@ -317,7 +321,7 @@ public class MavenLaunchDelegate extends JavaLaunchDelegate implements MavenLaun
       }
       if(mainVersion != null) {
         return matchingJREs.stream()
-            .filter(jre -> getArtifactVersion(jre).getMajorVersion() == mainVersion.getMajorVersion()).findFirst()
+            .filter(jre -> getJREVersion(jre).getMajorVersion() == mainVersion.getMajorVersion()).findFirst()
             .orElse(null);
       }
       return !matchingJREs.isEmpty() ? matchingJREs.get(0) : null;
@@ -334,8 +338,9 @@ public class MavenLaunchDelegate extends JavaLaunchDelegate implements MavenLaun
     for(IVMInstallType vmType : JavaRuntime.getVMInstallTypes()) {
       for(IVMInstall vm : vmType.getVMInstalls()) {
         if(satisfiesVersionRange(vm, versionRange)) {
-          if(vm instanceof IVMInstall2 vm2) {
-            installedJREsByVersion.put(new DefaultArtifactVersion(vm2.getJavaVersion()), vm);
+          ArtifactVersion jreVersion = getJREVersion(vm);
+          if(jreVersion != DEFAULT_JAVA_VERSION) {
+            installedJREsByVersion.put(jreVersion, vm);
           } else {
             log.debug("Skipping IVMInstall '{}' from type {} as not implementing IVMInstall2", vm.getName(),
                 vmType.getName());
@@ -347,7 +352,7 @@ public class MavenLaunchDelegate extends JavaLaunchDelegate implements MavenLaun
   }
 
   private static boolean satisfiesVersionRange(IVMInstall jre, VersionRange versionRange) {
-    ArtifactVersion jreVersion = getArtifactVersion(jre);
+    ArtifactVersion jreVersion = getJREVersion(jre);
     if(versionRange.getRecommendedVersion() != null) {
       return jreVersion.compareTo(versionRange.getRecommendedVersion()) >= 0;
     }
@@ -356,8 +361,14 @@ public class MavenLaunchDelegate extends JavaLaunchDelegate implements MavenLaun
 
   private static final ArtifactVersion DEFAULT_JAVA_VERSION = new DefaultArtifactVersion("0.0.0");
 
-  private static ArtifactVersion getArtifactVersion(IVMInstall jre) {
-    return jre instanceof IVMInstall2 jre2 ? new DefaultArtifactVersion(jre2.getJavaVersion()) : DEFAULT_JAVA_VERSION;
+  private static ArtifactVersion getJREVersion(IVMInstall jre) {
+    if(jre instanceof IVMInstall2 jre2) {
+      String version = jre2.getJavaVersion();
+      if(version != null) {
+        return new DefaultArtifactVersion(version);
+      }
+    }
+    return DEFAULT_JAVA_VERSION;
   }
 
   @Override

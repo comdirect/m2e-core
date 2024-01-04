@@ -34,9 +34,9 @@ public class MavenPreferenceInitializer extends AbstractPreferenceInitializer {
     store.putBoolean(MavenPreferenceConstants.P_DEBUG_OUTPUT, false);
 
     store.putBoolean(MavenPreferenceConstants.P_OFFLINE, false);
-    store.putBoolean(MavenPreferenceConstants.P_GLOBAL_UPDATE_NEVER, true);
+    store.put(MavenPreferenceConstants.P_GLOBAL_UPDATE_POLICY, MavenPreferenceConstants.GLOBAL_UPDATE_POLICY_DEFAULT);
 
-    store.putBoolean(MavenPreferenceConstants.P_DOWNLOAD_SOURCES, false);
+    store.putBoolean(MavenPreferenceConstants.P_DOWNLOAD_SOURCES, true);
     store.putBoolean(MavenPreferenceConstants.P_DOWNLOAD_JAVADOC, false);
 
     store.put(MavenPreferenceConstants.P_OUTPUT_FOLDER, "target-eclipse"); //$NON-NLS-1$
@@ -66,5 +66,8 @@ public class MavenPreferenceInitializer extends AbstractPreferenceInitializer {
     store.putBoolean(MavenPreferenceConstants.P_AUTO_UPDATE_CONFIGURATION, true);
 
     store.putBoolean(MavenPreferenceConstants.P_ENABLE_SNAPSHOT_ARCHETYPES, false);
+
+    store.putBoolean(MavenPreferenceConstants.P_RESOLVE_MISSING_PROJECTS, true);
+    store.putInt(MavenPreferenceConstants.P_DEFAULT_COMPLETION_PROPOSAL_RELEVANCE, 100);
   }
 }

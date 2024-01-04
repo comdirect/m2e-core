@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: %Bundle-Name
 Bundle-SymbolicName: org.eclipse.m2e.core;singleton:=true
-Bundle-Version: 2.0.8.qualifier
+Bundle-Version: 2.4.0.qualifier
 Bundle-Activator: org.eclipse.m2e.core.internal.MavenPluginActivator
 Bundle-Vendor: %Bundle-Vendor
 Bundle-Localization: plugin
@@ -58,6 +58,7 @@ Import-Package: com.google.common.base;version="30.1.0",
  org.slf4j;version="[1.7.0,3.0.0)"
 Automatic-Module-Name: org.eclipse.m2e.core
 Service-Component: OSGI-INF/org.eclipse.m2e.core.embedder.MavenModelManager.xml,
+ OSGI-INF/org.eclipse.m2e.core.internal.MvnProtocolHandlerService.xml,
  OSGI-INF/org.eclipse.m2e.core.internal.embedder.EclipseLoggerManager.xml,
  OSGI-INF/org.eclipse.m2e.core.internal.embedder.MavenImpl.xml,
  OSGI-INF/org.eclipse.m2e.core.internal.embedder.PlexusContainerManager.xml,

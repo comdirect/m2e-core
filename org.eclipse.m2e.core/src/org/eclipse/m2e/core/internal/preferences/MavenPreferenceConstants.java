@@ -37,9 +37,11 @@ public interface MavenPreferenceConstants {
   String P_OFFLINE = PREFIX + "offline"; //$NON-NLS-1$
 
   /**
-   * boolean. if true, use org.eclipse.aether.repository.RepositoryPolicy.UPDATE_POLICY_NEVER as global update policy
+   * configure the global update policy
    */
-  String P_GLOBAL_UPDATE_NEVER = PREFIX + "globalUpdatePolicy"; //$NON-NLS-1$
+  String P_GLOBAL_UPDATE_POLICY = PREFIX + "globalUpdatePolicy"; //$NON-NLS-1$
+
+  String GLOBAL_UPDATE_POLICY_DEFAULT = "default"; //$NON-NLS-1$
 
   /** boolean */
   // public static final String P_UPDATE_SNAPSHOTS = PREFIX+"updateSnapshots";
@@ -95,6 +97,11 @@ public interface MavenPreferenceConstants {
 
   /** boolean **/
   String P_DEFAULT_POM_EDITOR_PAGE = "eclipse.m2.defaultPomEditorPage"; //$NON-NLS-1$
+
+  /** boolean **/
+  String P_RESOLVE_MISSING_PROJECTS = "eclipse.m2.resolveMissingWorkspaceProjects"; //$NON-NLS-1$
+
+  String P_DEFAULT_COMPLETION_PROPOSAL_RELEVANCE = "eclipse.m2.defaultCompletionRelevance"; //$NON-NLS-1$
 
   /**
    * @since 1.5

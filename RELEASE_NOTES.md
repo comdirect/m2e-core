@@ -1,5 +1,40 @@
 # Eclipse m2e - Release notes
 
+## 2.4.0
+
+* 📅 Release Date: 29th August 2023
+
+### Embedded and use Maven 3.9.4
+
+Updated the embedded Maven from version 3.9.1 to 3.9.4; [Maven 3.9.4 Release Notes](https://maven.apache.org/docs/3.9.4/release-notes.html).
+
+### Support for multiple embedded runtimes
+
+You can now install additional embedded Maven Runtimes using the m2eclipse update site
+
+![grafik](https://github.com/eclipse-m2e/m2e-core/assets/1331477/8ef45a1b-e2bf-46e3-909e-275ac3c21510)
+
+After the installation you can now select the desired default runtime, keep in mind that m2e internally still uses the `EMBEDDED` runtime even if another is selected. 
+
+![grafik](https://github.com/eclipse-m2e/m2e-core/assets/1331477/a849a70c-e7a6-4049-ac55-3338596dca7b)
+
+If you want to switch back to an older runtime you currently need to modify you eclipse installation:
+
+- Make sure the older runtime is already installed
+- close eclipse (and maybe make a backup)
+- go to the `plugins` folder and locate the folders starting with `org.eclipse.m2e.maven.runtime_<version>`
+- delete higher runtime versions (e.g. 3.9)
+- start eclipse and check that now an older runtime is used by default
+
+![grafik](https://github.com/eclipse-m2e/m2e-core/assets/1331477/ef04e7f4-e36b-4bbc-a4d3-ff92e6a5f9f4)
+
+### m2e.archetype.common changed it structure
+
+_Only relevant for developers of Plug-ins based on m2e_
+
+The single `org.eclipse.m2e.archetype.common` Bundle that used to embed the maven-archetype jars was replaced by a set of multiple bundles, where each corresponds to one of the embedded archetype jars and has reduced OSGi metadata just sufficient for the use with m2e.
+One of those bundles is again named `org.eclipse.m2e.archetype.common` and serves as host bundle for the others, which are fragments to it.
+
 ## 2.3.0
 
 * 📅 Release Date: 23th May 2023

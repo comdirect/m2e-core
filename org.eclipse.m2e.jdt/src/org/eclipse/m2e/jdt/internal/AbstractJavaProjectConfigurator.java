@@ -180,7 +180,8 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     MavenJdtPlugin.getDefault().getBuildpathManager().updateClasspath(project, monitor);
   }
 
-  protected IContainer getOutputLocation(ProjectConfigurationRequest request, IProject project) {
+  @SuppressWarnings("unused")
+  protected IContainer getOutputLocation(ProjectConfigurationRequest request, IProject project) throws CoreException {
     MavenProject mavenProject = request.mavenProject();
     return getFolder(project, mavenProject.getBuild().getOutputDirectory());
   }
@@ -424,7 +425,7 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     return paths;
   }
 
-  private void addSourceDirs(IClasspathDescriptor classpath, IProject project, List<String> sourceRoots,
+  protected void addSourceDirs(IClasspathDescriptor classpath, IProject project, List<String> sourceRoots,
       IPath outputPath, IPath[] inclusion, IPath[] exclusion, String sourceEncoding, IProgressMonitor monitor,
       boolean addTestFlag) throws CoreException {
 
@@ -666,6 +667,11 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       }
 
     }
+
+    // While "5" and "6" ... are valid synonyms for Java 5, Java 6 ... source/target,
+    // Eclipse expects the values 1.5 and 1.6 and so on.
+    source = sanitizeJavaVersion(source);
+    target = sanitizeJavaVersion(target);
 
     options.put(JavaCore.COMPILER_SOURCE, source);
     options.put(JavaCore.COMPILER_COMPLIANCE, source);

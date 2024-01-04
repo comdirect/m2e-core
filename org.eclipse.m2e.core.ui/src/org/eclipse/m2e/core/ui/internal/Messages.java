@@ -721,6 +721,18 @@ public class Messages extends NLS {
 
   public static String preferencesGlobalChecksumPolicy_fail;
 
+  public static String preferencesGlobalUpdatePolicy_default;
+
+  public static String preferencesGlobalUpdatePolicy;
+
+  public static String preferencesGlobalUpdatePolicy_never;
+
+  public static String preferencesGlobalUpdatePolicy_always;
+
+  public static String preferencesGlobalUpdatePolicy_daily;
+
+  public static String preferencesGlobalUpdatePolicy_hourly;
+
   public static String preferencesDownloadSources;
 
   public static String preferencesDownloadSourcesTooltip;
@@ -900,6 +912,10 @@ public class Messages extends NLS {
   public static String wizardProjectPageMaven2ValidatorArtifactIDinvalid;
 
   public static String pomEditorDefaultPage;
+
+  public static String resolveMissingWorkspaceProject;
+  
+  public static String defaultProposalRelevance;
 
   public static String ProjectRepositoriesNode_name;
 
