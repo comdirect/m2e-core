@@ -132,6 +132,8 @@ public class Messages extends NLS {
 
   public static String MavenImpl_error_read_settings2;
 
+  public static String MavenImpl_error_read_toolchains;
+
   public static String MavenImpl_error_resolve;
 
   public static String MavenImpl_error_sort;
@@ -199,10 +201,6 @@ public class Messages extends NLS {
   public static String ProjectConfigurationManager_error_failed;
 
   public static String ProjectConfigurationManager_error_rename;
-
-  public static String ProjectConfigurationManager_error_resolve;
-
-  public static String ProjectConfigurationManager_error_resolve2;
 
   public static String ProjectConfigurationManager_error_targetDir;
 

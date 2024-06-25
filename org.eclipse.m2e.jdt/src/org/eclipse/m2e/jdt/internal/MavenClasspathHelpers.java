@@ -16,7 +16,6 @@ package org.eclipse.m2e.jdt.internal;
 import java.util.stream.Stream;
 
 import org.eclipse.core.runtime.IPath;
-import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.core.IClasspathAttribute;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaProject;
@@ -30,6 +29,8 @@ import org.eclipse.m2e.jdt.IClasspathManager;
 
 
 public class MavenClasspathHelpers {
+
+  public static final IPath MAVEN_CLASSPATH_CONTAINER_PATH = IPath.fromOSString(IClasspathManager.CONTAINER_ID);
 
   public static IClasspathEntry getJREContainerEntry(IJavaProject javaProject) {
     if(javaProject != null) {
@@ -56,12 +57,16 @@ public class MavenClasspathHelpers {
         && JavaRuntime.JRE_CONTAINER.equals(containerPath.segment(0));
   }
 
-  public static IClasspathEntry getDefaultContainerEntry() {
-    return JavaCore.newContainerEntry(new Path(IClasspathManager.CONTAINER_ID));
+  public static IClasspathEntry getDefaultContainerEntry(boolean isExported) {
+    return JavaCore.newContainerEntry(MAVEN_CLASSPATH_CONTAINER_PATH, isExported);
   }
 
-  public static IClasspathEntry getDefaultContainerEntry(boolean isExported) {
-    return JavaCore.newContainerEntry(new Path(IClasspathManager.CONTAINER_ID), isExported);
+  public static IClasspathEntry getDefaultContainerEntry(IClasspathAttribute... attributes) {
+    return JavaCore.newContainerEntry(MAVEN_CLASSPATH_CONTAINER_PATH, null, attributes, false/*not exported*/);
+  }
+
+  public static IClasspathEntry newContainerEntry(IPath path, IClasspathAttribute... attributes) {
+    return JavaCore.newContainerEntry(path, null, attributes, false/*not exported*/);
   }
 
   public static boolean isTestSource(IClasspathEntry entry) {

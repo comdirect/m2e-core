@@ -31,7 +31,6 @@ import org.eclipse.core.runtime.IConfigurationElement;
 import org.eclipse.core.runtime.IExecutableExtension;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.NullProgressMonitor;
-import org.eclipse.core.runtime.Path;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
@@ -228,7 +227,7 @@ public class ExecutePomAction implements ILaunchShortcut, IExecutableExtension, 
 
   private void setProjectConfiguration(ILaunchConfigurationWorkingCopy workingCopy, IContainer basedir) {
     IMavenProjectRegistry projectManager = MavenPlugin.getMavenProjectRegistry();
-    IFile pomFile = basedir.getFile(new Path(IMavenConstants.POM_FILE_NAME));
+    IFile pomFile = basedir.getFile(IPath.fromOSString(IMavenConstants.POM_FILE_NAME));
     IMavenProjectFacade projectFacade = projectManager.create(pomFile, false, new NullProgressMonitor());
     if(projectFacade != null) {
       IProjectConfiguration configuration = projectFacade.getConfiguration();
@@ -348,7 +347,7 @@ public class ExecutePomAction implements ILaunchShortcut, IExecutableExtension, 
         if(workDir == null) {
           continue;
         }
-        IPath workPath = new Path(workDir);
+        IPath workPath = IPath.fromOSString(workDir);
         if(basedirLocation.equals(workPath)) {
           matchingConfigs.add(configuration);
         }
@@ -399,6 +398,9 @@ public class ExecutePomAction implements ILaunchShortcut, IExecutableExtension, 
   }
 
   private ILaunchConfiguration[] findLaunches(IContainer parent) {
+    if(parent == null) {
+      return new ILaunchConfiguration[0];
+    }
     try {
       List<ILaunchConfiguration> matchingConfigurations = ExecutePomAction
           .getMatchingConfigurations(parent.getLocation());

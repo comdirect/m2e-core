@@ -55,6 +55,10 @@ public interface IMavenConfiguration {
 
   void setUserSettingsFile(String absolutePath) throws CoreException;
 
+  String getUserToolchainsFile();
+
+  void setUserToolchainsFile(String absolutePath) throws CoreException;
+
   // resolution
 
   boolean isDownloadSources();
@@ -129,6 +133,8 @@ public interface IMavenConfiguration {
    * @return whether to use null as scheduling rule for builder.
    */
   boolean buildWithNullSchedulingRule();
+
+  MavenSettingsLocations getSettingsLocations();
 
   static IMavenConfiguration getWorkspaceConfiguration() {
     MavenPluginActivator activator = MavenPluginActivator.getDefault();

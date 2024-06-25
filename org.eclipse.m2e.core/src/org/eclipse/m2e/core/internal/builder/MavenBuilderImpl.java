@@ -28,7 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,6 +86,10 @@ public class MavenBuilderImpl {
 
   private final Map<IProject, ProjectBuildState> deltaState = new ConcurrentHashMap<>();
 
+  private enum DeltaType {
+    INCREMENTAL, IRRELEVANT, FULL_BUILD, UNKOWN;
+  }
+
   public MavenBuilderImpl(DeltaProvider deltaProvider) {
     this.deltaProvider = deltaProvider;
     this.incrementalBuildFrameworks = loadIncrementalBuildFrameworks();
@@ -117,13 +122,14 @@ public class MavenBuilderImpl {
 
     DeltaProvider deltaProvider = getDeltaProvider();
     IResourceDelta delta = deltaProvider.getDelta(project);
-    if(!hasRelevantDelta(projectFacade, delta)) {
+    DeltaType deltaType = hasRelevantDelta(projectFacade, delta);
+    if(deltaType == DeltaType.IRRELEVANT) {
       return Set.of(project);
     }
     ProjectBuildState buildState = deltaState.computeIfAbsent(project, ProjectBuildState::new);
     final BuildResultCollector participantResults = new BuildResultCollector();
     List<BuildContext> incrementalContexts = setupProjectBuildContext(project, kind, delta, participantResults,
-        buildState);
+        buildState, deltaType);
 
     debugBuildStart(debugHooks, projectFacade, kind, args, participants, delta, monitor);
 
@@ -199,27 +205,37 @@ public class MavenBuilderImpl {
     return dependencies;
   }
 
-  private boolean hasRelevantDelta(IMavenProjectFacade projectFacade, IResourceDelta resourceDelta)
+  private DeltaType hasRelevantDelta(IMavenProjectFacade projectFacade, IResourceDelta resourceDelta)
       throws CoreException {
     if(resourceDelta == null) {
-      return true;
+      return DeltaType.FULL_BUILD;
     }
     IProject project = projectFacade.getProject();
     IPath buildOutputLocation = projectFacade.getBuildOutputLocation();
     if(project == null || buildOutputLocation == null) {
-      return true;
+      return DeltaType.UNKOWN;
     }
+
+    Predicate<IPath> isOutput = toPrefixPredicate(projectFacade.getOutputLocation());
+    Predicate<IPath> isTestOutput = toPrefixPredicate(projectFacade.getTestOutputLocation());
+    Predicate<IPath> isOutputOrTestOutput = isOutput.or(isTestOutput);
+
     IPath projectPath = project.getFullPath();
     List<IPath> moduleLocations = projectFacade.getMavenProjectModules().stream()
         .map(module -> projectPath.append(module)).toList();
-    AtomicBoolean hasRelevantDelta = new AtomicBoolean();
+    AtomicReference<DeltaType> deltaType = new AtomicReference<>(DeltaType.IRRELEVANT);
     resourceDelta.accept(delta -> {
       IResource resource = delta.getResource();
       if(resource instanceof IFile) {
         IPath fullPath = delta.getFullPath();
         if(buildOutputLocation.isPrefixOf(fullPath)) {
           //anything in the build output is not interesting for a change as it is produced by the build
-          //lets see if there are more interesting parts...
+          // ... unless a classpath resource that existed before has been deleted, possibly by another builder
+          if(isOutputOrTestOutput.test(fullPath) && !resource.exists()) {
+            //in this case we should perform a full build as we can't know what mojo has placed data possible here...
+            deltaType.set(DeltaType.FULL_BUILD);
+            return false;
+          }
           return true;
         }
         for(IPath modulePath : moduleLocations) {
@@ -229,21 +245,29 @@ public class MavenBuilderImpl {
           }
         }
         //anything else has changed, so mark this as relevant an leave the loop
-        hasRelevantDelta.set(true);
+        deltaType.set(DeltaType.INCREMENTAL);
         return false;
       }
       return true;
     });
-    return hasRelevantDelta.get();
+    return deltaType.get();
+  }
+
+  private static Predicate<IPath> toPrefixPredicate(IPath location) {
+    if(location == null) {
+      return (p) -> false;
+    }
+    return (p) -> location.isPrefixOf(p);
   }
 
   private List<IIncrementalBuildFramework.BuildContext> setupProjectBuildContext(IProject project, int kind,
-      IResourceDelta delta, IIncrementalBuildFramework.BuildResultCollector results, ProjectBuildState buildState)
+      IResourceDelta delta, IIncrementalBuildFramework.BuildResultCollector results, ProjectBuildState buildState,
+      DeltaType deltaType)
       throws CoreException {
     List<IIncrementalBuildFramework.BuildContext> contexts = new ArrayList<>();
 
-    BuildDelta buildDelta = delta != null ? new ProjectBuildStateDelta(buildState, new EclipseResourceBuildDelta(delta))
-        : null;
+    BuildDelta buildDelta = deltaType == DeltaType.FULL_BUILD || delta == null ? null
+        : new ProjectBuildStateDelta(buildState, new EclipseResourceBuildDelta(delta));
     for(IIncrementalBuildFramework framework : incrementalBuildFrameworks) {
       contexts.add(framework.setupProjectBuildContext(project, kind, buildDelta, results));
     }
@@ -421,7 +445,7 @@ public class MavenBuilderImpl {
 
     final BuildResultCollector participantResults = new BuildResultCollector();
     List<BuildContext> incrementalContexts = setupProjectBuildContext(project, IncrementalProjectBuilder.CLEAN_BUILD,
-        null, participantResults, null);
+        null, participantResults, null, DeltaType.UNKOWN);
 
     Map<Throwable, MojoExecutionKey> buildErrors = new LinkedHashMap<>();
     try {

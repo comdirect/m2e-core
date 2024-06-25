@@ -14,13 +14,20 @@
 package org.eclipse.m2e.jdt.internal;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import org.osgi.framework.Version;
 import org.slf4j.Logger;
@@ -30,10 +37,11 @@ import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.core.runtime.Path;
+import org.eclipse.core.runtime.QualifiedName;
 import org.eclipse.core.runtime.SubMonitor;
 import org.eclipse.jdt.core.IAccessRule;
 import org.eclipse.jdt.core.IClasspathAttribute;
@@ -101,7 +109,7 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
   protected static final LinkedHashMap<String, String> ENVIRONMENTS = new LinkedHashMap<>();
 
   static {
-    Set<String> supportedExecutionEnvironmentTypes = Set.of("JRE", "J2SE", "JavaSE");
+    Set<String> supportedExecutionEnvironmentTypes = Set.of("J2SE", "JavaSE");
 
     List<String> sources = new ArrayList<>();
 
@@ -112,19 +120,22 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
 
     List<String> releases = new ArrayList<>(List.of("6", "7", "8"));
 
-    for(var ee : JavaRuntime.getExecutionEnvironmentsManager().getExecutionEnvironments()) {
-      var eeId = ee.getId();
-      if(supportedExecutionEnvironmentTypes.stream().filter(type -> eeId.startsWith(type)).findAny().isEmpty()) {
+    for(IExecutionEnvironment ee : JavaRuntime.getExecutionEnvironmentsManager().getExecutionEnvironments()) {
+      String eeId = ee.getId();
+      if(supportedExecutionEnvironmentTypes.stream().noneMatch(eeId::startsWith)) {
         continue;
       }
-      var compliance = ee.getComplianceOptions().get(JavaCore.COMPILER_COMPLIANCE);
-      if(compliance != null) {
-        sources.add(compliance);
-        targets.add(compliance);
-        if(JavaCore.ENABLED.equals(ee.getComplianceOptions().get(JavaCore.COMPILER_RELEASE))) {
-          releases.add(compliance);
+      Map<String, String> complianceOptions = ee.getComplianceOptions();
+      if(complianceOptions != null) {
+        String compliance = complianceOptions.get(JavaCore.COMPILER_COMPLIANCE);
+        if(compliance != null) {
+          sources.add(compliance);
+          targets.add(compliance);
+          if(JavaCore.ENABLED.equals(complianceOptions.get(JavaCore.COMPILER_RELEASE))) {
+            releases.add(compliance);
+          }
+          ENVIRONMENTS.put(compliance, eeId);
         }
-        ENVIRONMENTS.put(compliance, eeId);
       }
     }
 
@@ -134,6 +145,9 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
   }
 
   protected static final String DEFAULT_COMPILER_LEVEL = "1.5"; //$NON-NLS-1$
+
+  private static final QualifiedName LINKED_MAVEN_RESOURCE = new QualifiedName(MavenJdtPlugin.PLUGIN_ID,
+      "linkedSource");
 
   @Override
   public void configure(ProjectConfigurationRequest request, IProgressMonitor monitor) throws CoreException {
@@ -214,14 +228,15 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
 
   protected void addJREClasspathContainer(IClasspathDescriptor classpath, String environmentId) {
 
-    IClasspathEntry cpe;
     IExecutionEnvironment executionEnvironment = getExecutionEnvironment(environmentId);
-    if(executionEnvironment == null) {
-      cpe = JavaRuntime.getDefaultJREContainerEntry();
-    } else {
-      IPath containerPath = JavaRuntime.newJREContainerPath(executionEnvironment);
-      cpe = JavaCore.newContainerEntry(containerPath);
-    }
+    IPath containerPath = executionEnvironment == null //
+        ? JavaRuntime.newDefaultJREContainerPath() //
+        : JavaRuntime.newJREContainerPath(executionEnvironment);
+
+    // ensure the external annotation path is kept
+    IClasspathAttribute[] externalAnnotations = readExternalAnnotationAttributes(classpath,
+        p -> JavaRuntime.JRE_CONTAINER.equals(p.getPath().segment(0)));
+    IClasspathEntry cpe = MavenClasspathHelpers.newContainerEntry(containerPath, externalAnnotations);
 
     IClasspathEntryDescriptor cped = classpath
         .replaceEntry(descriptor -> JavaRuntime.JRE_CONTAINER.equals(descriptor.getPath().segment(0)), cpe);
@@ -261,13 +276,26 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       }
     }
 
-    IClasspathEntry cpe = MavenClasspathHelpers.getDefaultContainerEntry();
+    // ensure the external annotation path is kept
+    IClasspathAttribute[] externalAnnotations = readExternalAnnotationAttributes(classpath,
+        p -> MavenClasspathHelpers.MAVEN_CLASSPATH_CONTAINER_PATH.equals(p.getPath()));
+    IClasspathEntry cpe = MavenClasspathHelpers.getDefaultContainerEntry(externalAnnotations);
+
     // add new entry without removing existing entries first, see bug398121
     IClasspathEntryDescriptor entryDescriptor = classpath.addEntry(cpe);
     entryDescriptor.setExported(isExported);
     for(IAccessRule accessRule : accessRules) {
       entryDescriptor.addAccessRule(accessRule);
     }
+  }
+
+  private static IClasspathAttribute[] readExternalAnnotationAttributes(IClasspathDescriptor classpath,
+      Predicate<IClasspathEntryDescriptor> annotationSourceEntry) {
+    Optional<String> annotationPath = classpath.getEntryDescriptors().stream().filter(annotationSourceEntry)
+        .map(descr -> descr.getClasspathAttributes().get(IClasspathAttribute.EXTERNAL_ANNOTATION_PATH))
+        .filter(Objects::nonNull).filter(p -> !p.isBlank()).findFirst();
+    return annotationPath.map(p -> JavaCore.newClasspathAttribute(IClasspathAttribute.EXTERNAL_ANNOTATION_PATH, p))
+        .map(a -> new IClasspathAttribute[] {a}).orElseGet(() -> new IClasspathAttribute[] {});
   }
 
   protected void addProjectSourceFolders(IClasspathDescriptor classpath, ProjectConfigurationRequest request,
@@ -283,8 +311,8 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       MavenProject mavenProject = request.mavenProject();
       IMavenProjectFacade projectFacade = request.mavenProjectFacade();
 
-      IFolder classes = getFolder(project, mavenProject.getBuild().getOutputDirectory());
-      IFolder testClasses = getFolder(project, mavenProject.getBuild().getTestOutputDirectory());
+      IContainer classes = getFolder(project, mavenProject.getBuild().getOutputDirectory());
+      IContainer testClasses = getFolder(project, mavenProject.getBuild().getTestOutputDirectory());
 
       M2EUtils.createFolder(classes, true, mon.newChild(1));
       M2EUtils.createFolder(testClasses, true, mon.newChild(1));
@@ -362,6 +390,9 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
           isTestResourcesSkipped.add(Boolean.FALSE);
         }
       }
+
+      cleanLinkedSourceDirs(project, monitor);
+
       addSourceDirs(classpath, project, mavenProject.getCompileSourceRoots(), classes.getFullPath(), inclusion,
           exclusion, mainSourceEncoding, mon.newChild(1), false);
       addResourceDirs(classpath, project, mavenProject, mavenProject.getBuild().getResources(), classes.getFullPath(),
@@ -419,7 +450,7 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     IPath[] paths = new IPath[values.length];
     for(int i = 0; i < values.length; i++ ) {
       if(values[i] != null && !"".equals(values[i].trim())) {
-        paths[i] = new Path(values[i]);
+        paths[i] = IPath.fromOSString(values[i]);
       }
     }
     return paths;
@@ -430,7 +461,7 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       boolean addTestFlag) throws CoreException {
 
     for(String sourceRoot : sourceRoots) {
-      IFolder sourceFolder = getFolder(project, sourceRoot);
+      IContainer sourceFolder = getFolder(project, sourceRoot);
 
       if(sourceFolder == null) {
         // this cannot actually happen, unless I misunderstand how project.getFolder works
@@ -447,7 +478,7 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       }
 
       // Set folder encoding (null = platform/container default)
-      if(sourceFolder.exists()) {
+      if(sourceFolder.exists() && !Objects.equals(sourceFolder.getDefaultCharset(false), sourceEncoding)) {
         sourceFolder.setDefaultCharset(sourceEncoding, monitor);
       }
 
@@ -467,6 +498,14 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       }
     }
 
+  }
+
+  private void cleanLinkedSourceDirs(IProject project, IProgressMonitor monitor) throws CoreException {
+    for(IResource resource : project.members()) {
+      if(resource instanceof IFolder && "true".equals(resource.getPersistentProperty(LINKED_MAVEN_RESOURCE))) {
+        resource.delete(false, monitor);
+      }
+    }
   }
 
   private IClasspathEntryDescriptor getEnclosingEntryDescriptor(IClasspathDescriptor classpath, IPath fullPath) {
@@ -496,9 +535,13 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       if(directory == null) {
         continue;
       }
-      File resourceDirectory = new File(directory);
-      IPath relativePath = getProjectRelativePath(project, directory);
-      IResource r = project.findMember(relativePath);
+      File resourceDirectory = null;
+      try {
+        resourceDirectory = new File(directory).getCanonicalFile();
+      } catch(IOException ex) {
+        resourceDirectory = new File(directory).getAbsoluteFile();
+      }
+      IContainer r = getFolder(project, resourceDirectory.getPath());
       if(r == project) {
         /*
          * Workaround for the Java Model Exception:
@@ -518,10 +561,6 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
         log.error("Skipping resource folder " + r.getFullPath());
         return;
       }
-      if(r == null) {
-        //this means the resources does not exits (yet) but might be created later on!
-        r = project.getFolder(relativePath);
-      }
       if(project.equals(r.getProject())) {
         IPath path = r.getFullPath();
         IClasspathEntryDescriptor enclosing = getEnclosingEntryDescriptor(classpath, path);
@@ -534,12 +573,11 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
           addResourceFolder(classpath, path, outputPath, addTestFlag);
         }
         // Set folder encoding (null = platform default)
-        IFolder resourceFolder = project.getFolder(relativePath);
-        if(resourceFolder.exists()) {
-          resourceFolder.setDefaultCharset(resourceEncoding, monitor);
+        if(r.exists() && !Objects.equals(r.getDefaultCharset(false), resourceEncoding)) {
+          r.setDefaultCharset(resourceEncoding, monitor);
         }
       } else {
-        log.info("Not adding resources folder " + resourceDirectory.getAbsolutePath());
+        log.info("Not adding resources folder " + resourceDirectory);
       }
     }
   }
@@ -548,7 +586,7 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       boolean addTestFlag) {
     log.info("Adding resource folder " + resourceFolder);
     IClasspathEntryDescriptor descriptor = classpath.addSourceEntry(resourceFolder, outputPath, DEFAULT_INCLUSIONS,
-        new IPath[] {new Path("**")}, false /*optional*/);
+        new IPath[] {IPath.fromOSString("**")}, false /*optional*/);
     descriptor.setClasspathAttribute(IClasspathManager.TEST_ATTRIBUTE, addTestFlag ? "true" : null);
     descriptor.setClasspathAttribute(IClasspathAttribute.OPTIONAL, "true"); //$NON-NLS-1$
   }
@@ -557,8 +595,8 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       IPath resourceFolder) {
     // resources and sources folders overlap. make sure JDT only processes java sources.
     log.info("Resources folder " + resourceFolder + " overlaps with sources folder " + enclosing.getPath());
-    enclosing.addInclusionPattern(new Path("**/*.java"));
-    enclosing.removeExclusionPattern(new Path("**"));
+    enclosing.addInclusionPattern(IPath.fromOSString("**/*.java"));
+    enclosing.removeExclusionPattern(IPath.fromOSString("**"));
     classpath.touchEntry(resourceFolder);
   }
 
@@ -566,42 +604,27 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     IPath relPath = path.makeRelativeTo(project.getFullPath());
     List<String> compile = mavenProject.getCompileSourceRoots();
     List<String> test = mavenProject.getTestCompileSourceRoots();
-    return isContained(relPath, project, getSourceFolders(project, compile))
-        || isContained(relPath, project, getSourceFolders(project, test));
+    return isContained(relPath, getSourceFolders(project, compile))
+        || isContained(relPath, getSourceFolders(project, test));
   }
 
   private boolean overlapsWithOtherResourceFolder(IPath path, IProject project, MavenProject mavenProject) {
     IPath relPath = path.makeRelativeTo(project.getFullPath());
-    return isContained(relPath, project, getOtherResourceFolders(project, mavenProject.getResources(), relPath))
-        || isContained(relPath, project, getOtherResourceFolders(project, mavenProject.getTestResources(), relPath));
+    return isContained(relPath, getOtherResourceFolders(project, mavenProject.getResources(), relPath))
+        || isContained(relPath, getOtherResourceFolders(project, mavenProject.getTestResources(), relPath));
   }
 
-  private IPath[] getSourceFolders(IProject project, List<String> sources) {
-    List<IPath> paths = new ArrayList<>();
-    for(String source : sources) {
-      paths.add(getProjectRelativePath(project, source));
-    }
-    return paths.toArray(new IPath[paths.size()]);
+  private Stream<IPath> getSourceFolders(IProject project, List<String> sources) {
+    return sources.stream().map(Path::of).map(source -> getProjectRelativePath(project, source));
   }
 
-  private IPath[] getOtherResourceFolders(IProject project, List<Resource> resources, IPath curPath) {
-    List<IPath> paths = new ArrayList<>();
-    for(Resource res : resources) {
-      IPath path = getProjectRelativePath(project, res.getDirectory());
-      if(!path.equals(curPath)) {
-        paths.add(path);
-      }
-    }
-    return paths.toArray(new IPath[paths.size()]);
+  private Stream<IPath> getOtherResourceFolders(IProject project, List<Resource> resources, IPath curPath) {
+    return resources.stream().map(Resource::getDirectory).map(Path::of)//
+        .map(res -> getProjectRelativePath(project, res)).filter(path -> !path.equals(curPath));
   }
 
-  private boolean isContained(IPath path, IProject project, IPath[] otherPaths) {
-    for(IPath otherPath : otherPaths) {
-      if(otherPath.isPrefixOf(path)) {
-        return true;
-      }
-    }
-    return false;
+  private static boolean isContained(IPath path, Stream<IPath> otherPaths) {
+    return otherPaths.anyMatch(p -> p.isPrefixOf(path));
   }
 
   protected void addJavaProjectOptions(Map<String, String> options, ProjectConfigurationRequest request,
@@ -765,6 +788,17 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     } catch(CoreException ex) {
       //ignore
     }
+
+    //3nd, check the --enable-preview flag in the ${maven.compiler.enablePreview}
+    try {
+      Boolean enablePreview = maven.getMojoParameterValue(mavenProject, execution, "enablePreview", Boolean.class, //$NON-NLS-1$
+          monitor);
+      if(Boolean.TRUE.equals(enablePreview)) {
+        return true;
+      }
+    } catch(CoreException ex) {
+      //ignore
+    }
     return false;
   }
 
@@ -854,24 +888,39 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     }
   }
 
-  protected IFolder getFolder(IProject project, String absolutePath) {
-    if(project.getLocation().makeAbsolute().equals(Path.fromOSString(absolutePath))) {
-      return project.getFolder(project.getLocation());
+  protected IContainer getFolder(IProject project, String path) throws CoreException {
+    Path projectLocation = project.getLocation().toPath().toAbsolutePath();
+    Path folderPath = Path.of(path);
+    if(projectLocation.equals(folderPath)) {
+      return project;
     }
-    return project.getFolder(getProjectRelativePath(project, absolutePath));
+    IPath relativePath;
+    if(folderPath.isAbsolute()) {
+      relativePath = getProjectRelativePath(project, folderPath);
+    } else {
+      folderPath = projectLocation.resolve(path);
+      relativePath = IPath.fromOSString(path);
+    }
+    if(!project.exists(relativePath) && Files.exists(folderPath)
+        && !ResourcesPlugin.getWorkspace().getRoot().getLocation().toPath().equals(folderPath)) {
+      String linkName = projectLocation.relativize(folderPath).toString().replace("/", "_");
+      IFolder folder = project.getFolder(linkName);
+      folder.createLink(folderPath.toUri(), IResource.REPLACE, null);
+      folder.setPersistentProperty(LINKED_MAVEN_RESOURCE, "true");
+      return folder;
+    }
+    return project.getFolder(relativePath);
   }
 
-  protected IPath getProjectRelativePath(IProject project, String absolutePath) {
-    File basedir = project.getLocation().toFile();
-    String relative;
-    if(absolutePath.equals(basedir.getAbsolutePath())) {
-      relative = "."; //$NON-NLS-1$
-    } else if(absolutePath.startsWith(basedir.getAbsolutePath())) {
-      relative = absolutePath.substring(basedir.getAbsolutePath().length() + 1);
+  private static IPath getProjectRelativePath(IProject project, Path absolutePath) {
+    Path basedir = project.getLocation().toPath().toAbsolutePath();
+    if(absolutePath.equals(basedir)) {
+      return IPath.fromOSString(".");
+    } else if(absolutePath.startsWith(basedir)) {
+      return IPath.fromPath(basedir.relativize(absolutePath));
     } else {
-      relative = absolutePath;
+      return IPath.fromPath(absolutePath);
     }
-    return new Path(relative.replace('\\', '/'));
   }
 
   /**

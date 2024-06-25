@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -53,7 +54,6 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
-import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.SubMonitor;
 import org.eclipse.core.runtime.jobs.ISchedulingRule;
@@ -489,8 +489,10 @@ public class ProjectConfigurationManager
     MavenProject mavenProject = request.mavenProject();
     Properties mavenProperties = mavenProject.getProperties();
     String sourceEncoding = mavenProperties.getProperty("project.build.sourceEncoding");
-    log.debug("Setting encoding for project {}: {}", project.getName(), sourceEncoding); //$NON-NLS-1$
-    project.setDefaultCharset(sourceEncoding, monitor);
+    if(!Objects.equals(project.getDefaultCharset(false), sourceEncoding)) {
+      log.debug("Setting encoding for project {}: {}", project.getName(), sourceEncoding); //$NON-NLS-1$
+      project.setDefaultCharset(sourceEncoding, monitor);
+    }
 
     IMavenExecutionContext executionContext = projectManager.createExecutionContext(mavenProjectFacade.getPom(),
         mavenProjectFacade.getConfiguration());
@@ -837,7 +839,7 @@ public class ProjectConfigurationManager
       project.create(monitor);
     } else {
       IProjectDescription description = workspace.newProjectDescription(projectName);
-      description.setLocation(new Path(projectDir.getAbsolutePath()));
+      description.setLocation(IPath.fromOSString(projectDir.getAbsolutePath()));
       project.create(description, monitor);
     }
 
@@ -886,12 +888,16 @@ public class ProjectConfigurationManager
 
         if(facade != null) {
           ProblemSeverity outOfDateSeverity = ProblemSeverity.get(mavenConfiguration.getOutOfDateProjectSeverity());
-          mavenMarkerManager.deleteMarkers(facade.getProject(), IMavenConstants.MARKER_CONFIGURATION_ID);
+          IProject project = facade.getProject();
+          mavenMarkerManager.deleteMarkers(project, IMavenConstants.MARKER_CONFIGURATION_ID);
           if(!ProblemSeverity.ignore.equals(outOfDateSeverity)) {
             LifecycleMappingConfiguration oldConfiguration = LifecycleMappingConfiguration.restore(facade, monitor);
             if(oldConfiguration != null
                 && LifecycleMappingFactory.isLifecycleMappingChanged(facade, oldConfiguration, monitor)) {
-              mavenMarkerManager.addMarker(facade.getProject(), IMavenConstants.MARKER_CONFIGURATION_ID,
+              if(!ResolverConfigurationIO.isAutomaticallyUpdateConfiguration(project)) {
+                outOfDateSeverity = ProblemSeverity.info;
+              }
+              mavenMarkerManager.addMarker(project, IMavenConstants.MARKER_CONFIGURATION_ID,
                   Messages.ProjectConfigurationUpdateRequired, -1, outOfDateSeverity.getSeverity());
             }
           }

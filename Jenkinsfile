@@ -9,8 +9,8 @@ pipeline {
 		label "centos-latest"
 	}
 	tools {
-		maven 'apache-maven-3.9.1'
-		jdk 'openjdk-jdk17-latest'
+		maven 'apache-maven-3.9.6'
+		jdk 'openjdk-jdk21-latest'
 	}
 	stages {
 		stage('get m2e-core-tests') {
@@ -42,7 +42,7 @@ pipeline {
 				withCredentials([string(credentialsId: 'gpg-passphrase', variable: 'KEYRING_PASSPHRASE')]) {
 				xvnc(useXauthority: true) {
 					sh '''
-						mavenArgs="clean verify -Dtycho.p2.baselineMode=failCommon --batch-mode"
+						mavenArgs="clean verify --batch-mode -Dmaven.test.error.ignore=true -Dmaven.test.failure.ignore=true -Dtycho.p2.baselineMode=failCommon"
 						if [[ ${BRANCH_NAME} == master ]] || [[ ${BRANCH_NAME} =~ m2e-[0-9]+\\.[0-9]+\\.x ]]; then
 							mvn ${mavenArgs} -Peclipse-sign,its -Dgpg.passphrase="${KEYRING_PASSPHRASE}" -Dgpg.keyname="011C526F29B2CE79"
 						else

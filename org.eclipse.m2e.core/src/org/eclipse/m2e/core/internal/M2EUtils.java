@@ -25,12 +25,10 @@ import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IResource;
-import org.eclipse.core.resources.IResourceStatus;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.core.runtime.Path;
 
 import org.apache.maven.model.Plugin;
 import org.apache.maven.project.MavenProject;
@@ -48,13 +46,17 @@ public class M2EUtils {
    * @param monitor the progress monitor
    * @throws CoreException if creating the given <code>folder</code> or any of its parents fails.
    */
-  public static void createFolder(IFolder folder, boolean derived, IProgressMonitor monitor) throws CoreException {
+  public static void createFolder(IContainer container, boolean derived, IProgressMonitor monitor)
+      throws CoreException {
+    if(!(container instanceof IFolder folder)) {
+      return; // don't create projects
+    }
     // Recurse until we find a parent folder which already exists.
     if(!folder.exists()) {
       IContainer parent = folder.getParent();
       // First, make sure that all parent folders exist.
       if(parent != null && !parent.exists()) {
-        createFolder((IFolder) parent, false, monitor);
+        createFolder(parent, false, monitor);
       }
       try {
         if(!folder.exists()) {
@@ -62,7 +64,7 @@ public class M2EUtils {
         }
       } catch(CoreException ex) {
         //Don't fail if the resource already exists, in case of a race condition
-        if(ex.getStatus().getCode() != IResourceStatus.RESOURCE_EXISTS) {
+        if (!folder.exists()) {
           throw ex;
         }
       }
@@ -103,7 +105,7 @@ public class M2EUtils {
     }
     //XXX copied from XmlUtils.extractProject()
     File file = new File(project.getFile().toURI());
-    IPath path = Path.fromOSString(file.getAbsolutePath());
+    IPath path = IPath.fromOSString(file.getAbsolutePath());
     Stack<IFile> stack = new Stack<>();
     //here we need to find the most inner project to the path.
     //we do so by shortening the path and remembering all the resources identified.

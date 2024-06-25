@@ -63,7 +63,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.MultiStatus;
 import org.eclipse.core.runtime.OperationCanceledException;
-import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.SubMonitor;
 import org.eclipse.core.runtime.jobs.ISchedulingRule;
@@ -145,8 +144,8 @@ public class ProjectRegistryManager implements ISaveParticipant {
    * need to be updated.
    */
   public static final List<IPath> METADATA_PATH = List.of( //
-      new Path("pom.xml"), // //$NON-NLS-1$
-      new Path(".settings/" + IMavenConstants.PLUGIN_ID + ".prefs")); // dirty trick! //$NON-NLS-1$ //$NON-NLS-2$
+      IPath.fromOSString("pom.xml"), // //$NON-NLS-1$
+      IPath.fromOSString(".settings/" + IMavenConstants.PLUGIN_ID + ".prefs")); // dirty trick! //$NON-NLS-1$ //$NON-NLS-2$
 
   private ProjectRegistry projectRegistry;
 
@@ -238,7 +237,11 @@ public class ProjectRegistryManager implements ISaveParticipant {
       // XXX sensible handling
       return null;
     }
-    File baseDir = project.getLocation().toFile();
+    IPath location = project.getLocation();
+    if(location == null) {
+      return project.getFile(IMavenConstants.POM_FILE_NAME);
+    }
+    File baseDir = location.toFile();
     Optional<File> pom = IMavenToolbox.of(containerManager.getComponentLookup(baseDir)).locatePom(baseDir);
     return pom.map(pomFile -> {
       IFile file = project.getFile(pomFile.getName());
@@ -853,7 +856,7 @@ public class ProjectRegistryManager implements ISaveParticipant {
   }
 
   public IFile getModulePom(IFile pom, String moduleName) {
-    return pom.getParent().getFile(new Path(moduleName).append(IMavenConstants.POM_FILE_NAME));
+    return pom.getParent().getFile(IPath.fromOSString(moduleName).append(IMavenConstants.POM_FILE_NAME));
   }
 
   private Set<IFile> refreshWorkspaceModules(MutableProjectRegistry state, ArtifactKey mavenProject) {
@@ -990,8 +993,6 @@ public class ProjectRegistryManager implements ISaveParticipant {
 
     // eclipse workspace repository implements both workspace dependency resolution
     // and inter-module dependency resolution for multi-module projects.
-
-    request.setLocalRepository(maven.getLocalRepository());
     request.setWorkspaceReader(getWorkspaceReader(state, pom, resolverConfiguration));
     if(pom != null && pom.getLocation() != null) {
       request.setMultiModuleProjectDirectory(

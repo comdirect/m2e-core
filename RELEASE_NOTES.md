@@ -1,5 +1,67 @@
 # Eclipse m2e - Release notes
 
+## 2.6.1
+
+* 📅 Release Date: 04th June 2024
+
+Various minor bug-fixes, enhancements and dependency updates.
+
+### Embedded and use Maven 3.9.7
+
+Updated the embedded Maven from version 3.9.6 to 3.9.7; [Maven 3.9.7 Release Notes](https://maven.apache.org/docs/3.9.7/release-notes.html).
+
+## 2.6.0
+
+* 📅 Release Date: 21th February 2024
+
+### Embedded and use Maven 3.9.6
+
+Updated the embedded Maven from version 3.9.5 to 3.9.6; [Maven 3.9.6 Release Notes](https://maven.apache.org/docs/3.9.6/release-notes.html).
+
+### Improved toolchain.xml handling
+
+In the Preferences under `Maven -> User Settings` the user `toolchain.xml` used in workspace builds can now be specified explicitly.
+At the same time the `maven-toolchains-plugin` is now disabled by default for workspace builds.
+
+### Improved resource linking
+
+Source or resource folders of Maven-projects outside of the project's base directory are now considered in the workspace and are added to the project as linked resources.
+
+### Project preference for automated Maven project configuration updates
+
+Automatic configuration updates for Maven projects can now be disabled the in the project preferences.
+This allows to disable these updates individually per project and to store the setting in a preference-file under version control,
+which is useful for projects that require special workspace configuration that doesn't exactly match the configuration in the `pom.xml`.
+
+![grafik](https://github.com/eclipse-m2e/m2e-core/assets/44067969/7d27ceda-5d13-4f0e-97f0-ff34c94d7493)
+
+### Support of global and user settings in .mvn/maven.config
+
+The `.mvn/maven.config` allows to specify [global and user settings](https://maven.apache.org/settings.html#quick-overview), m2e now also takes these into account.
+
+This improvement was gently sponsored by <img src="https://www.sigasi.com/img/logoSquare.png"  width="16" height="16"> [Sigasi](https://www.sigasi.com/). 
+
+## 2.5.0
+
+* 📅 Release Date: 27th November 2023
+
+### Embedded and use Maven 3.9.5
+
+Updated the embedded Maven from version 3.9.4 to 3.9.5; [Maven 3.9.5 Release Notes](https://maven.apache.org/docs/3.9.5/release-notes.html).
+
+### Dropped aether-okhttp-connector
+
+Previously, m2e embedded [`aether-okhttp-connector`](https://github.com/takari/aether-connector-okhttp), an alternative to Wagon HTTP connector, based on [OkHttp](https://square.github.io/okhttp/), which was developed at a time when Maven 2's HTTP Connector didn't leverage HTTP/2 and parallel downloads.
+
+However, the usage of this alternative connector introduced certain inconsistencies when compared to regular Maven CLI builds.
+These discrepancies, often revolving around matters of authentication and proxies, posed challenges.
+Maven 3.x significantly improved its resolver implementations, largely mitigating the advantages of `aether-okhttp-connector` and bringing new features.
+This shift left the `aether-okhttp-connector` outdated and that project has now been abandoned.
+
+m2e 2.4 has been adjusted to better align with the Maven 3.9 runtime.
+This adjustment is expected to result in fewer issues pertaining to artifact resolution and proxy authentication.
+However, due to its removal from the runtime, there exists a potential risk that third-party Plug-ins dependent on m2e's integrated `OkHttp` functionality might experience disruptions.
+
 ## 2.4.0
 
 * 📅 Release Date: 29th August 2023

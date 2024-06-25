@@ -20,28 +20,27 @@
 	</parent>
 
 	<artifactId>org.eclipse.m2e.maven.runtime</artifactId>
-	<version>3.9.400-SNAPSHOT</version>
+	<version>3.9.700-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<name>M2E Embedded Maven Runtime (includes Incubating components)</name>
 
 	<properties>
 		<!-- maven core version -->
-		<maven-core.version>3.9.4</maven-core.version>
+		<maven-core.version>3.9.7</maven-core.version>
 		<!-- NOTE: When maven-core.version changes, this may impact the versions of the maven-resolver-*
 			jars that export the org.eclipse.aether.* packages in the org.eclipse.m2e.maven.runtime
 			bundle. So make sure the following variable has the value of the maven-resolver-* jars
 			https://bugs.eclipse.org/bugs/show_bug.cgi?id=529540 -->
-		<maven-resolver.version>1.9.14</maven-resolver.version>
+		<maven-resolver.version>1.9.20</maven-resolver.version>
+		<apache-commons-codec.version>1.16.1</apache-commons-codec.version><!-- Keep in sync with what maven includes-->
 		<!-- below are m2e-specific addons -->
-		<plexus-build-api.version>0.0.7</plexus-build-api.version>
-		<okhttp-connector.version>0.17.8</okhttp-connector.version>
+		<plexus-build-api.version>1.2.0</plexus-build-api.version>
 		<jars.directory>target/jars</jars.directory>
 		<outputDirectory.sources>${project.build.directory}/classes-source</outputDirectory.sources>
 		<failIfMacSigningFailed>false</failIfMacSigningFailed>
 		<buildqualifier.format>%Y%m%d-%H%M</buildqualifier.format>
 	</properties>
-
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.maven</groupId>
@@ -74,20 +73,9 @@
 			<artifactId>org.eclipse.sisu.plexus</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>org.sonatype.plexus</groupId>
+			<groupId>org.codehaus.plexus</groupId>
 			<artifactId>plexus-build-api</artifactId>
 			<version>${plexus-build-api.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.takari.aether</groupId>
-			<artifactId>aether-connector-okhttp</artifactId>
-			<version>${okhttp-connector.version}</version>
-			<exclusions>
-				<exclusion>
-					<groupId>org.eclipse.aether</groupId>
-					<artifactId>aether-util</artifactId>
-				</exclusion>
-			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven.resolver</groupId>
@@ -100,6 +88,18 @@
 		<dependency>
 			<groupId>org.apache.maven.resolver</groupId>
 			<artifactId>maven-resolver-transport-wagon</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.resolver</groupId>
+			<artifactId>maven-resolver-transport-file</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.resolver</groupId>
+			<artifactId>maven-resolver-transport-http</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.maven.wagon</groupId>
+			<artifactId>wagon-http</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.maven.wagon</groupId>
@@ -141,6 +141,17 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
+			<groupId>commons-codec</groupId>
+			<artifactId>commons-codec</artifactId>
+			<version>${apache-commons-codec.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-lang3</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
 			<groupId>javax.annotation</groupId>
 			<artifactId>javax.annotation-api</artifactId>
 			<scope>provided</scope>
@@ -170,7 +181,7 @@
 				<plugin>
 					<groupId>biz.aQute.bnd</groupId>
 					<artifactId>bnd-maven-plugin</artifactId>
-					<version>6.4.0</version>
+					<version>7.0.0</version>
 					<extensions>true</extensions>
 					<configuration>
 						<bnd><![CDATA[
@@ -192,14 +203,16 @@
 								org.sonatype.plexus.*;provider=m2e;mandatory:=provider,\
 								org.eclipse.aether.*;provider=m2e;mandatory:=provider;version=${maven-resolver.version},\
 								com.google.inject.*;provider=m2e;mandatory:=provider,\
-								io.takari.*;provider=m2e;mandatory:=provider,\
+								org.apache.maven.wagon.*;provider=m2e;mandatory:=provider,\
 								org.eclipse.sisu.*;provider=m2e;mandatory:=provider;version=${maven-resolver.version}
 							Import-Package: \
 								org.slf4j;version="[1.7.31,3.0.0)",\
 								org.slf4j.*;version="[1.7.31,3.0.0)",\
-								javax.inject;version="1.0.0",\
+								javax.inject;version="[1.0.0,2.0.0)",\
 								javax.annotation;version="[1.2.0,2.0.0)", \
-								org.apache.commons.cli;version="[1.4.0,2.0.0)"
+								org.apache.commons.cli;version="[1.4.0,2.0.0)", \
+								org.apache.commons.codec*, \
+								org.apache.commons.lang3*
 							Require-Bundle: \
 								com.google.guava;bundle-version="32.0.1"
 
@@ -222,7 +235,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-compiler-plugin</artifactId>
-					<version>3.10.1</version>
+					<version>3.13.0</version>
 					<configuration>
 						<source>1.8</source>
 						<target>1.8</target>
@@ -232,7 +245,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-dependency-plugin</artifactId>
-					<version>3.4.0</version>
+					<version>3.6.1</version>
 					<configuration>
 						<overWriteIfNewer>true</overWriteIfNewer>
 						<includeScope>runtime</includeScope> <!-- only include runtime and compile time dependencies, not test or provided! -->
@@ -241,7 +254,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-resources-plugin</artifactId>
-					<version>3.3.0</version>
+					<version>3.3.1</version>
 				</plugin>
 				<plugin>
 					<groupId>org.eclipse.tycho</groupId>
@@ -259,7 +272,7 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>animal-sniffer-maven-plugin</artifactId>
-				<version>1.22</version>
+				<version>1.23</version>
 				<executions>
 					<execution>
 						<goals>
@@ -375,7 +388,7 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>build-helper-maven-plugin</artifactId>
-				<version>3.3.0</version>
+				<version>3.5.0</version>
 				<executions>
 					<execution>
 						<?m2e ignore?>
@@ -397,7 +410,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-source-plugin</artifactId>
-				<version>3.2.1</version>
+				<version>3.3.1</version>
 				<executions>
 					<execution>
 						<?m2e ignore?>
