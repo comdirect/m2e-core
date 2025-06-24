@@ -1,5 +1,29 @@
 # Eclipse m2e - Release notes
 
+## 2.9.0
+
+* 📅 Release Date: 05th June 2025
+
+Various minor bug-fixes, enhancements and dependency updates.
+
+## 2.8.0
+
+* 📅 Release Date: 03rd March 2025
+
+### Auto-Completion support for `bnd-maven-plugin` and `felix-bundle-plugin` with lemminx editor
+
+The bnd-maven and felix-bundle plugin provide a way to use
+bnd-instructions to build OSGi bundles. As this is a complex (and extensible) syntax that
+can not be expressed as regular maven-mojo configuration lemminx-maven
+can not supply any useful completions.
+
+m2e now contains a new lemminx-extension that provides such completions in a
+basic way to support people writing such bnd instructions in pom xml configurations.
+
+### Support for variables in maven installations
+
+In the preferences for maven installations one can now specify variables for maven location.
+
 ## 2.7.0
 
 * 📅 Release Date: 26th November 2024
@@ -216,9 +240,9 @@ The connector for the `bnd-maven-plugin` and `maven-bundle-plugin`, which is inc
 The M2E Maven-Console now also supports tracking of so called _polyglot_ Maven-projects. Those are projects that don't have a standard `pom.xml` and whose Maven-model is instead created from another source. One prominent example in the Eclipse world are Eclipse-PDE projects that are build with Tycho(-pomless).
 
 Due to this new support, polyglot Maven projects now also benefit from the
-[Improved links to JUnit test-reports and project file in the Console](https://github.com/eclipse-m2e/m2e-core/blob/master/RELEASE_NOTES.md#improved-links-to-junit-test-reports-and-project-pomxml-in-the-console-of-a-maven-build)
+[Improved links to JUnit test-reports and project file in the Console](https://github.com/eclipse-m2e/m2e-core/blob/main/RELEASE_NOTES.md#improved-links-to-junit-test-reports-and-project-pomxml-in-the-console-of-a-maven-build)
 as well as the capability to
-[Automatically launch and attach Remote-Application-Debugger when Maven plug-in starts a forked JVM that waits for a debugger](https://github.com/eclipse-m2e/m2e-core/blob/master/RELEASE_NOTES.md#automatically-launch-and-attach-remote-application-debugger-when-maven-plug-in-starts-a-forked-jvm-that-waits-for-a-debugger) introduced in previous releases.
+[Automatically launch and attach Remote-Application-Debugger when Maven plug-in starts a forked JVM that waits for a debugger](https://github.com/eclipse-m2e/m2e-core/blob/main/RELEASE_NOTES.md#automatically-launch-and-attach-remote-application-debugger-when-maven-plug-in-starts-a-forked-jvm-that-waits-for-a-debugger) introduced in previous releases.
 
 ## 2.0.2
 

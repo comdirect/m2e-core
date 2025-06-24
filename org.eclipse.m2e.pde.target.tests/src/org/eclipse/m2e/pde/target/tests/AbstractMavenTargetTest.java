@@ -32,7 +32,9 @@ import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.jar.Attributes;
+import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.jar.JarInputStream;
 import java.util.stream.Collectors;
 
 import org.eclipse.core.runtime.IStatus;
@@ -124,13 +126,20 @@ public abstract class AbstractMavenTargetTest {
 		if (key == null) {
 			return false;
 		}
+		if (key.groupId().equals("-")) {
+			return true;
+		}
 		URI location = getLocation.apply(unit);
-		String expectedPathSuffix = "/" + String.join("/", ".m2", "repository", key.groupId().replace('.', '/'),
+		String expectedPathSuffix = "/" + String.join("/", "repository", key.groupId().replace('.', '/'),
 				key.artifactId(), key.version(), key.artifactId() + "-" + key.version() + ".jar");
 		return location.toASCIIString().endsWith(expectedPathSuffix);
 	}
 
 	// --- assertion utilities for Bundles in target ---
+
+	static ExpectedBundle bundle(String bsn, String version) {
+		return new ExpectedBundle(bsn, version, false, true, new ArtifactKey("-", bsn, version, ""));
+	}
 
 	static ExpectedBundle originalOSGiBundle(String bsn, String version, String groupArtifact) {
 		return originalOSGiBundle(bsn, version, groupArtifact, version);
@@ -160,6 +169,17 @@ public abstract class AbstractMavenTargetTest {
 		File file = URIUtil.toFile(bundleInfo.getLocation());
 		try (var jar = new JarFile(file)) {
 			return jar.getManifest().getMainAttributes();
+		}
+	}
+
+	static void assertValidSignature(TargetBundle targetBundle) throws IOException {
+		try (JarInputStream stream = new JarInputStream(
+				targetBundle.getBundleInfo().getLocation().toURL().openStream())) {
+			for (JarEntry entry = stream.getNextJarEntry(); entry != null; entry = stream.getNextJarEntry()) {
+				for (byte[] drain = new byte[4096]; stream.read(drain, 0, drain.length) != -1;) {
+					// nothing we just want to trigger the signature verification
+				}
+			}
 		}
 	}
 

@@ -19,6 +19,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -27,16 +29,56 @@ import java.util.function.Function;
 import java.util.jar.Attributes;
 
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.equinox.frameworkadmin.BundleInfo;
 import org.eclipse.osgi.util.ManifestElement;
 import org.eclipse.pde.core.target.ITargetLocation;
 import org.eclipse.pde.core.target.TargetBundle;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
 import org.osgi.framework.Version;
 import org.osgi.framework.VersionRange;
 
+import aQute.bnd.osgi.Jar;
+
 public class OSGiMetadataGenerationTest extends AbstractMavenTargetTest {
+
+	@Test
+	public void testNonJarArtifactInDependencies() throws Exception {
+		ITargetLocation target = resolveMavenTarget(
+				"""
+						    <location includeDependencyDepth="infinite" includeDependencyScopes="compile,provided,runtime" includeSource="true" label="Azure OpenAI" missingManifest="generate" type="Maven">
+						        <dependencies>
+						            <dependency>
+						                <groupId>com.azure</groupId>
+						                <artifactId>azure-ai-openai</artifactId>
+						                <version>1.0.0-beta.13</version>
+						                <type>jar</type>
+						            </dependency>
+						        </dependencies>
+						    </location>
+						""");
+		assertStatusOk(getTargetStatus(target));
+	}
+
+	@Test
+	public void testVersionRanges() throws Exception {
+		ITargetLocation target = resolveMavenTarget(
+				"""
+						<location includeDependencyDepth="infinite" includeDependencyScopes="compile,provided,runtime" includeSource="true" label="cucumber" missingManifest="generate" type="Maven">
+						    <dependencies>
+						        <dependency>
+						            <groupId>io.cucumber</groupId>
+						            <artifactId>cucumber-java</artifactId>
+						            <version>7.21.1</version>
+						            <type>jar</type>
+						        </dependency>
+						    </dependencies>
+						</location>
+						        """);
+		assertStatusOk(getTargetStatus(target));
+	}
 
 	@Test
 	public void testBadDependencyInChain() throws Exception {
@@ -53,6 +95,107 @@ public class OSGiMetadataGenerationTest extends AbstractMavenTargetTest {
 				</location>
 				""");
 		assertStatusOk(getTargetStatus(target));
+	}
+
+	@Test
+	public void testBadSymbolicName() throws Exception {
+		ITargetLocation target = resolveMavenTarget("""
+				<location includeDependencyScope="compile" missingManifest="generate" type="Maven">
+				    <dependencies>
+				        <dependency>
+				            <groupId>javax.xml.ws</groupId>
+				            <artifactId>jaxws-api</artifactId>
+				            <version>2.3.1</version>
+				        </dependency>
+				    </dependencies>
+				</location>
+				""");
+		assertStatusOk(getTargetStatus(target));
+	}
+
+	@Test
+	public void testWithClassifierFailsToCollect() throws Exception {
+		String targetXML = """
+				<location includeDependencyDepth="%depth%" includeDependencyScopes="compile,provided,runtime,system" includeSource="false" missingManifest="generate" type="Maven">
+					<dependencies>
+						<dependency>
+							<groupId>org.ehcache</groupId>
+							<artifactId>ehcache</artifactId>
+							<version>3.10.0</version>
+							<type>jar</type>
+							<classifier>jakarta</classifier>
+						</dependency>
+					</dependencies>
+				</location>
+				""";
+		for (String deepth : new String[] { "none", "direct", "infinite" }) {
+			ITargetLocation target = resolveMavenTarget(targetXML.replace("%depth%", deepth));
+			assertStatusOk(getTargetStatus(target));
+			TargetBundle[] bundles = target.getBundles();
+			for (TargetBundle targetBundle : bundles) {
+				URI location = targetBundle.getBundleInfo().getLocation();
+				assertTrue(
+						"bundle with classifier was not correctly fetched width deepth = " + deepth + " location = "
+								+ location,
+						location.toString().endsWith("org/ehcache/ehcache/3.10.0/ehcache-3.10.0-jakarta.jar"));
+			}
+		}
+	}
+
+	@Test
+	@Ignore("see https://gitlab.eclipse.org/eclipsefdn/helpdesk/-/issues/5987")
+	public void testSourceWithSignature() throws Exception {
+		ITargetLocation target = resolveMavenTarget(
+				"""
+						<location includeDependencyDepth="none" includeDependencyScopes="compile" label="LemMinX" includeSource="true" missingManifest="error" type="Maven">
+						    <dependencies>
+						        <dependency>
+						            <groupId>org.eclipse.lemminx</groupId>
+						            <artifactId>org.eclipse.lemminx</artifactId>
+						            <version>0.29.0</version>
+						            <type>jar</type>
+						        </dependency>
+						    </dependencies>
+						    <repositories>
+						        <repository>
+						            <id>lemminx-releases</id>
+						            <url>https://repo.eclipse.org/content/repositories/lemminx-releases/</url>
+						        </repository>
+						    </repositories>
+						</location>
+						""");
+		assertStatusOk(getTargetStatus(target));
+		TargetBundle[] allBundles = target.getBundles();
+		boolean sourcesFound = false;
+		for (TargetBundle targetBundle : allBundles) {
+			if (targetBundle.isSourceBundle()) {
+				sourcesFound = true;
+				assertValidSignature(targetBundle);
+			}
+		}
+		assertTrue("No source bundle generated!", sourcesFound);
+	}
+
+	@Test
+	public void testArtifactWithSignature() throws Exception {
+		ITargetLocation target = resolveMavenTarget(
+				"""
+						<location includeDependencyDepth="none" includeDependencyScopes="compile" label="verapdf" includeSource="true" missingManifest="generate" type="Maven">
+						    <dependencies>
+						        <dependency>
+						            <groupId>org.verapdf</groupId>
+						            <artifactId>core</artifactId>
+						            <version>1.26.5</version>
+						        </dependency>
+						    </dependencies>
+						</location>
+						""");
+		assertStatusOk(getTargetStatus(target));
+		TargetBundle[] allBundles = target.getBundles();
+		for (TargetBundle targetBundle : allBundles) {
+			assertValidSignature(targetBundle);
+		}
+		assertTrue("No bundle generated!", allBundles.length > 0);
 	}
 
 	@Test
@@ -183,6 +326,44 @@ public class OSGiMetadataGenerationTest extends AbstractMavenTargetTest {
 		assertNull(sourceAttributes.getValue(Constants.EXPORT_PACKAGE));
 		assertNull(sourceAttributes.getValue(Constants.REQUIRE_BUNDLE));
 		assertNull(sourceAttributes.getValue(Constants.DYNAMICIMPORT_PACKAGE));
+	}
+
+	@Test
+	public void testConditionalPackage() throws Exception {
+		ITargetLocation target = resolveMavenTarget(
+				"""
+						<location includeDependencyDepth="none" includeDependencyScopes="compile" includeSource="false" label="Maven-archetype" missingManifest="generate" type="Maven">
+						<dependencies>
+							<dependency>
+								<groupId>org.apache.maven.archetype</groupId>
+								<artifactId>archetype-common</artifactId>
+								<version>3.3.1</version>
+								<type>jar</type>
+							</dependency>
+							</dependencies>
+							<instructions><![CDATA[
+								Bundle-Name:           Bundle in Test from artifact ${mvnGroupId}:${mvnArtifactId}:${mvnVersion}:${mvnClassifier}
+								version:               ${version_cleanup;${mvnVersion}}
+								Bundle-SymbolicName:   m2e.custom.test.wrapped.${mvnArtifactId}
+								Bundle-Version:        ${version}
+								Import-Package:        *
+								Export-Package:        org.apache.maven.archetype;version="${version}";-noimport:=true
+								-conditionalpackage:   org.apache.commons.*
+							]]></instructions>
+						</location>
+						""");
+		assertStatusOk(getTargetStatus(target));
+		TargetBundle[] bundles = target.getBundles();
+		for (TargetBundle bundle : bundles) {
+			BundleInfo bundleInfo = bundle.getBundleInfo();
+			File file = new File(bundleInfo.getLocation());
+			try (Jar jar = new Jar(file)) {
+				Set<String> resources = jar.getResources().keySet();
+				assertTrue("Conditional package org.apache.commons.* not included.",
+						resources.stream().anyMatch(s -> s.startsWith("org/apache/commons/")));
+			}
+			;
+		}
 	}
 
 	@Test
