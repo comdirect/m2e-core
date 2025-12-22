@@ -80,6 +80,11 @@ import org.eclipse.m2e.jdt.MavenJdtPlugin;
 public abstract class AbstractJavaProjectConfigurator extends AbstractProjectConfigurator
     implements IJavaProjectConfigurator {
 
+  /**
+     * 
+     */
+  private static final String MULTI_RELEASE_OUTPUT = "multiReleaseOutput";
+
   private static final IPath[] DEFAULT_INCLUSIONS = new IPath[0];
 
   private static final Logger log = LoggerFactory.getLogger(AbstractJavaProjectConfigurator.class);
@@ -164,8 +169,13 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
 
     addProjectSourceFolders(classpath, options, request, monitor);
 
-    String executionEnvironmentId = getExecutionEnvironmentId(options);
-    addJREClasspathContainer(classpath, executionEnvironmentId);
+    int highestMultiReleaseOption = getHighestMultiReleaseOption(request, monitor);
+    if(highestMultiReleaseOption >= 9) {
+      addJREClasspathContainer(classpath, "JavaSE-" + highestMultiReleaseOption);
+    } else {
+      String executionEnvironmentId = getExecutionEnvironmentId(options);
+      addJREClasspathContainer(classpath, executionEnvironmentId);
+    }
 
     addMavenClasspathContainer(classpath);
 
@@ -193,7 +203,31 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     UnitTestSupport.resetLaunchConfigurations(project);
   }
 
-  @SuppressWarnings("unused")
+  private int getHighestMultiReleaseOption(ProjectConfigurationRequest request, IProgressMonitor monitor)
+      throws CoreException {
+    int highest = -1;
+    for(MojoExecution compile : getCompilerMojoExecutions(request, monitor)) {
+      Boolean multiReleaseOutput = maven.getMojoParameterValue(request.mavenProject(), compile, MULTI_RELEASE_OUTPUT,
+          Boolean.class, monitor);
+      if(!Boolean.TRUE.equals(multiReleaseOutput)) {
+        continue;
+      }
+      String release = maven.getMojoParameterValue(request.mavenProject(), compile, "release", String.class, monitor);
+      if(release == null) {
+        continue;
+      }
+      try {
+        int parsedRelease = Integer.parseInt(release);
+        if(parsedRelease > highest) {
+          highest = parsedRelease;
+        }
+      } catch(RuntimeException e) {
+
+      }
+    }
+    return highest;
+  }
+
   protected IContainer getOutputLocation(ProjectConfigurationRequest request, IProject project) throws CoreException {
     MavenProject mavenProject = request.mavenProject();
     return getFolder(project, mavenProject.getBuild().getOutputDirectory());
@@ -304,7 +338,7 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
 
   protected void addProjectSourceFolders(IClasspathDescriptor classpath, Map<String, String> options,
       ProjectConfigurationRequest request, IProgressMonitor monitor) throws CoreException {
-    SubMonitor mon = SubMonitor.convert(monitor, 6);
+    SubMonitor mon = SubMonitor.convert(monitor, 7);
     try {
       IProject project = request.mavenProjectFacade().getProject();
       MavenProject mavenProject = request.mavenProject();
@@ -396,6 +430,10 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
           exclusion, mainSourceEncoding, mon.newChild(1), false);
       addResourceDirs(classpath, project, mavenProject, mavenProject.getBuild().getResources(), classes.getFullPath(),
           mainResourcesEncoding, mon.newChild(1), false);
+
+      // Handle multi-release JAR source folders
+      addMultiReleaseSourceFolders(classpath, project, mavenProject, executions, classes.getFullPath(),
+          mainSourceEncoding, mon.newChild(1));
 
       //If the project properties contain m2e.disableTestClasspathFlag=true, then the test flag must not be set
       boolean addTestFlag = !MavenClasspathHelpers.hasTestFlagDisabled(mavenProject);
@@ -497,6 +535,64 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       }
     }
 
+  }
+
+  /**
+   * Adds multi-release source folders for executions that have multiReleaseOutput enabled. These folders are configured
+   * to output to META-INF/versions/{version}/ for multi-release JARs.
+   * 
+   * @param classpath the classpath descriptor
+   * @param project the Eclipse project
+   * @param mavenProject the Maven project
+   * @param executions the compiler plugin executions
+   * @param outputPath the base output path for compiled classes
+   * @param sourceEncoding the source encoding
+   * @param monitor the progress monitor
+   * @throws CoreException if an error occurs
+   */
+  protected void addMultiReleaseSourceFolders(IClasspathDescriptor classpath, IProject project,
+      MavenProject mavenProject, List<MojoExecution> executions, IPath outputPath, String sourceEncoding,
+      IProgressMonitor monitor) throws CoreException {
+
+    for(MojoExecution execution : executions) {
+      // Check if this execution has multiReleaseOutput enabled
+      Boolean multiReleaseOutput = maven.getMojoParameterValue(mavenProject, execution, MULTI_RELEASE_OUTPUT,
+          Boolean.class, monitor);
+      if(!Boolean.TRUE.equals(multiReleaseOutput)) {
+        continue;
+      }
+      String release = maven.getMojoParameterValue(mavenProject, execution, "release", String.class, monitor);
+      if(release == null) {
+        continue;
+      }
+      String sanitizedRelease = sanitizeJavaVersion(release);
+      @SuppressWarnings("unchecked")
+      List<String> compileSourceRoots = maven.getMojoParameterValue(mavenProject, execution, "compileSourceRoots",
+          List.class, monitor);
+      if(compileSourceRoots == null || compileSourceRoots.isEmpty()) {
+        continue;
+      }
+      // Add each source folder with the new property in classpath
+      for(String sourceRoot : compileSourceRoots) {
+        IContainer sourceFolder = getFolder(project, sourceRoot);
+        if(sourceFolder == null) {
+          continue;
+        }
+        sourceFolder.refreshLocal(IResource.DEPTH_ZERO, monitor);
+        if(sourceFolder.exists() && !sourceFolder.getProject().equals(project)) {
+          continue;
+        }
+        if(sourceFolder.exists() && !Objects.equals(sourceFolder.getDefaultCharset(false), sourceEncoding)) {
+          sourceFolder.setDefaultCharset(sourceEncoding, monitor);
+        }
+        IClasspathEntryDescriptor enclosing = getEnclosingEntryDescriptor(classpath, sourceFolder.getFullPath());
+        if(enclosing == null || getEntryDescriptor(classpath, sourceFolder.getFullPath()) != null) {
+          IClasspathEntryDescriptor descriptor = classpath.addSourceEntry(sourceFolder.getFullPath(), null, true);
+          descriptor.setClasspathAttribute(IClasspathAttribute.OPTIONAL, "true");
+          descriptor.setClasspathAttribute("release", sanitizedRelease);
+        }
+      }
+    }
   }
 
   private void cleanLinkedSourceDirs(IProject project, IProgressMonitor monitor) throws CoreException {
@@ -638,6 +734,11 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     boolean enablePreviewFeatures = false;
 
     for(MojoExecution execution : getCompilerMojoExecutions(request, monitor)) {
+      String id = execution.getExecutionId();
+      if(!"default-compile".equals(id)) {
+        //Maven can have many but JDT only supports one config!
+        continue;
+      }
       release = getCompilerLevel(request.mavenProject(), execution, "release", release, RELEASES, monitor);
       //XXX ignoring testRelease option, since JDT doesn't support main/test classpath separation - yet
       source = getCompilerLevel(request.mavenProject(), execution, "source", source, SOURCES, monitor); //$NON-NLS-1$
@@ -904,11 +1005,73 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
         && !ResourcesPlugin.getWorkspace().getRoot().getLocation().toPath().equals(folderPath)) {
       String linkName = projectLocation.relativize(folderPath).toString().replace("/", "_");
       IFolder folder = project.getFolder(linkName);
-      folder.createLink(folderPath.toUri(), IResource.REPLACE, null);
+      createLinkWithRetry(folder, folderPath.toUri());
       folder.setPersistentProperty(LINKED_MAVEN_RESOURCE, "true");
       return folder;
     }
     return project.getFolder(relativePath);
+  }
+
+  /**
+   * Creates a linked resource with retry logic to handle intermittent failures on Windows. The parent resource may not
+   * be accessible immediately after project creation.
+   * 
+   * @param folder the folder to create the link for
+   * @param target the target URI for the link
+   * @throws CoreException if all retry attempts fail
+   */
+  private void createLinkWithRetry(IFolder folder, java.net.URI target) throws CoreException {
+    int maxAttempts = 10;
+    long initialDelay = 100; // milliseconds
+
+    for(int attempt = 1; attempt <= maxAttempts; attempt++ ) {
+      try {
+        // Ensure the parent project is accessible before attempting to create the link
+        IProject project = folder.getProject();
+        if(project != null && !project.isAccessible()) {
+          if(attempt < maxAttempts) {
+            log.debug("Project {} is not accessible, waiting before retry...", project.getName());
+            sleepWithExponentialBackoff(initialDelay, attempt, folder.getFullPath().toString());
+            continue;
+          }
+        }
+
+        folder.createLink(target, IResource.REPLACE, null);
+        if(attempt > 1) {
+          log.info("Successfully created linked resource for {} after {} attempts", folder.getFullPath(), attempt);
+        }
+        return; // Success
+      } catch(CoreException e) {
+        // Check if this is the specific error we want to retry
+        if(attempt < maxAttempts) {
+          log.warn("Failed to create linked resource for {} (attempt {}/{}): {}. Retrying...", folder.getFullPath(),
+              attempt, maxAttempts, e.getMessage());
+          sleepWithExponentialBackoff(initialDelay, attempt, folder.getFullPath().toString());
+        } else {
+          throw e;
+        }
+      }
+    }
+  }
+
+  /**
+   * Sleeps for a duration calculated using exponential backoff.
+   * 
+   * @param initialDelay the initial delay in milliseconds
+   * @param attempt the current attempt number (1-based)
+   * @param context context information for error messages
+   * @throws CoreException if interrupted during sleep
+   */
+  private void sleepWithExponentialBackoff(long initialDelay, int attempt, String context) throws CoreException {
+    long delay = initialDelay * (1L << (attempt - 1)); // exponential backoff: initialDelay * 2^(attempt-1)
+    try {
+      Thread.sleep(delay);
+    } catch(InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      throw new CoreException(org.eclipse.core.runtime.Status.error(
+          "Interrupted while waiting for project resource to become accessible during linked resource creation for "
+              + context));
+    }
   }
 
   private static IPath getProjectRelativePath(IProject project, Path absolutePath) {

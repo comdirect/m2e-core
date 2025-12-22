@@ -10,7 +10,9 @@
 
 package org.eclipse.m2e.jdt.tests;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
@@ -37,6 +39,7 @@ import org.eclipse.m2e.core.internal.preferences.MavenConfigurationImpl;
 import org.eclipse.m2e.jdt.internal.UnitTestSupport;
 import org.eclipse.m2e.jdt.internal.launch.MavenRuntimeClasspathProvider;
 import org.eclipse.m2e.tests.common.AbstractMavenProjectTestCase;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -53,6 +56,11 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 	private static final String ROOT_PATH = "/projects/surefireFailsafeToTestLaunchSettings";
 	private static ILaunchManager LAUNCH_MANAGER = DebugPlugin.getDefault().getLaunchManager();
 
+	/*
+	 * XML allows encoding set of control characters: space (U+0020), carriage
+	 * return (U+000d), line feed (U+000a) and horizontal tab (U+0009).
+	 * https://www.w3.org/TR/xml-entity-names/000.html
+	 */
 	private static final String SUREFIRE_ARGS_SET = """
 			<configuration>
 				<argLine>
@@ -60,6 +68,10 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 				</argLine>
 				<systemPropertyVariables>
 					<surefireProp1>surefireProp1Value</surefireProp1>
+					<surefirePropWithSpaces>surefire Prop&#x20;With Spaces</surefirePropWithSpaces>
+					<surefirePropWithTab>surefirePropWith&#x09;Tab</surefirePropWithTab>
+					<surefirePropWithCR>has&#x0d;CR</surefirePropWithCR>
+					<surefirePropWithLF>has&#x0a;LF</surefirePropWithLF>
 					<surefireEmptyProp>${undefinedProperty}</surefireEmptyProp>
 				</systemPropertyVariables>
 				<environmentVariables>
@@ -76,6 +88,10 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 				<systemPropertyVariables>
 					<failsafeProp1>failsafeProp1Value</failsafeProp1>
 					<failsafeEmptyProp>${undefiniedProperty}</failsafeEmptyProp>
+					<failsafePropWithSpaces>failsafe Prop&#x20;With Spaces</failsafePropWithSpaces>
+					<failsafePropWithTab>failsafePropWith&#x09;Tab</failsafePropWithTab>
+					<failsafePropWithCR>has&#x0d;CR</failsafePropWithCR>
+					<failsafePropWithLF>has&#x0a;LF</failsafePropWithLF>
 				</systemPropertyVariables>
 				<environmentVariables>
 					<failsafeEnvironmentVariables1>failsafeEnvironmentVariables1Value</failsafeEnvironmentVariables1>
@@ -134,8 +150,9 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 		ILaunchConfiguration config = updatedConfigurations[0];
 
 		// check argLine
-		String argLine = config.getAttribute(UnitTestSupport.LAUNCH_CONFIG_VM_ARGUMENTS, "");
-		assertTrue(argLine.contains("--argLineItem=surefireArgLineValue"));
+		String argLine = config.getAttribute(IJavaLaunchConfigurationConstants.ATTR_VM_ARGUMENTS, "");
+		assertThat(argLine, Matchers.containsString("--argLineItem=surefireArgLineValue --undefinedArgLineItem="));
+		assertThat(argLine, Matchers.not(Matchers.containsString("${undefinedProperty}")));
 
 		// check environmentVariables
 		Map<String, String> envVars = config.getAttribute(UnitTestSupport.LAUNCH_CONFIG_ENVIRONMENT_VARIABLES,
@@ -148,6 +165,12 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 
 		// check systemPropertyVariables
 		assertTrue(argLine.contains("-DsurefireProp1=surefireProp1Value"));
+
+		// check systemPropertyVariables with white space in values have values quoted
+		assertThat(argLine, Matchers.containsString("-DsurefirePropWithSpaces=\"surefire Prop With Spaces\""));
+		assertThat(argLine, Matchers.containsString("-DsurefirePropWithTab=\"surefirePropWith\tTab\""));
+		assertThat(argLine, Matchers.containsString("-DsurefirePropWithCR=\"has\rCR\""));
+		assertThat(argLine, Matchers.containsString("-DsurefirePropWithLF=\"has\nLF\""));
 
 		// check systemPropertyVariables with null value aren't set
 		assertTrue(!argLine.contains("-DsurefireEmptyProp="));
@@ -187,8 +210,9 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 		ILaunchConfiguration config = updatedConfigurations[0];
 
 		// check argLine
-		String argLine = config.getAttribute(UnitTestSupport.LAUNCH_CONFIG_VM_ARGUMENTS, "");
-		assertTrue(argLine.contains("--argLineItem=failsafeArgLineValue"));
+		String argLine = config.getAttribute(IJavaLaunchConfigurationConstants.ATTR_VM_ARGUMENTS, "");
+		assertThat(argLine, Matchers.containsString("--argLineItem=failsafeArgLineValue --undefinedArgLineItem="));
+		assertThat(argLine, Matchers.not(Matchers.containsString("${undefinedProperty}")));
 
 		// check environmentVariables
 		Map<String, String> envVars = config.getAttribute(UnitTestSupport.LAUNCH_CONFIG_ENVIRONMENT_VARIABLES,
@@ -204,6 +228,13 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 
 		// check systemPropertyVariables with null value aren't set
 		assertTrue(!argLine.contains("-DfailsafeEmptyProp="));
+
+		// check systemPropertyVariables with white space in values have values quoted
+		assertThat(argLine, Matchers.containsString("-DfailsafePropWithSpaces=\"failsafe Prop With Spaces\""));
+		assertThat(argLine, Matchers.containsString("-DfailsafePropWithTab=\"failsafePropWith\tTab\""));
+		assertThat(argLine, Matchers.containsString("-DfailsafePropWithCR=\"has\rCR\""));
+		assertThat(argLine, Matchers.containsString("-DfailsafePropWithLF=\"has\nLF\""));
+
 	}
 
 	@Test
@@ -232,8 +263,9 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 		ILaunchConfiguration config = updatedConfigurations[0];
 
 		// check argLine
-		String argLine = config.getAttribute(UnitTestSupport.LAUNCH_CONFIG_VM_ARGUMENTS, "");
-		assertTrue(argLine.contains("--argLineItem=surefireArgLineValue"));
+		String argLine = config.getAttribute(IJavaLaunchConfigurationConstants.ATTR_VM_ARGUMENTS, "");
+		assertThat(argLine, Matchers.containsString("--argLineItem=surefireArgLineValue --undefinedArgLineItem="));
+		assertThat(argLine, Matchers.not(Matchers.containsString("${undefinedProperty}")));
 
 		// check environmentVariables
 		Map<String, String> envVars = config.getAttribute(UnitTestSupport.LAUNCH_CONFIG_ENVIRONMENT_VARIABLES,
@@ -246,6 +278,13 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 
 		// check systemPropertyVariables
 		assertTrue(argLine.contains("-DsurefireProp1=surefireProp1Value"));
+
+		// check systemPropertyVariables with white space in values have values quoted
+		assertThat(argLine, Matchers.containsString("-DsurefirePropWithSpaces=\"surefire Prop With Spaces\""));
+		assertThat(argLine, Matchers.containsString("-DsurefirePropWithTab=\"surefirePropWith\tTab\""));
+		assertThat(argLine, Matchers.containsString("-DsurefirePropWithCR=\"has\rCR\""));
+		assertThat(argLine, Matchers.containsString("-DsurefirePropWithLF=\"has\nLF\""));
+
 	}
 
 	@Test
@@ -274,8 +313,9 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 		ILaunchConfiguration config = updatedConfigurations[0];
 
 		// check argLine
-		String argLine = config.getAttribute(UnitTestSupport.LAUNCH_CONFIG_VM_ARGUMENTS, "");
-		assertTrue(argLine.contains("--argLineItem=failsafeArgLineValue"));
+		String argLine = config.getAttribute(IJavaLaunchConfigurationConstants.ATTR_VM_ARGUMENTS, "");
+		assertThat(argLine, Matchers.containsString("--argLineItem=failsafeArgLineValue --undefinedArgLineItem="));
+		assertThat(argLine, Matchers.not(Matchers.containsString("${undefinedProperty}")));
 
 		// check environmentVariables
 		Map<String, String> envVars = config.getAttribute(UnitTestSupport.LAUNCH_CONFIG_ENVIRONMENT_VARIABLES,
@@ -288,6 +328,13 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 
 		// check systemPropertyVariables
 		assertTrue(argLine.contains("-DfailsafeProp1=failsafeProp1Value"));
+
+		// check systemPropertyVariables with white space in values have values quoted
+		assertThat(argLine, Matchers.containsString("-DfailsafePropWithSpaces=\"failsafe Prop With Spaces\""));
+		assertThat(argLine, Matchers.containsString("-DfailsafePropWithTab=\"failsafePropWith\tTab\""));
+		assertThat(argLine, Matchers.containsString("-DfailsafePropWithCR=\"has\rCR\""));
+		assertThat(argLine, Matchers.containsString("-DfailsafePropWithLF=\"has\nLF\""));
+
 	}
 
 	@Test
@@ -311,9 +358,9 @@ public class UnitTestLaunchConfigConfigurationTest extends AbstractMavenProjectT
 		assertTrue(updatedConfigurations.length == 1);
 
 		ILaunchConfiguration config = updatedConfigurations[0];
-		String argLine = config.getAttribute(UnitTestSupport.LAUNCH_CONFIG_VM_ARGUMENTS, "");
+		String argLine = config.getAttribute(IJavaLaunchConfigurationConstants.ATTR_VM_ARGUMENTS, "");
 		assertTrue(argLine.contains("-javaagent")); // resolved jacoco agent
-		assertTrue(argLine.contains("@{titi.tata}")); // unresolved property is unchanged as in CLI
+		assertFalse(argLine.contains("@{titi.tata}")); // unresolved property is removed
 	}
 
 	private void updateProject(IProject project) throws CoreException, InterruptedException {

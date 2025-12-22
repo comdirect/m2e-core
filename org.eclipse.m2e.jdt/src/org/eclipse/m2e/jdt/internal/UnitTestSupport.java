@@ -41,6 +41,7 @@ import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.core.ILaunchManager;
+import org.eclipse.jdt.launching.IJavaLaunchConfigurationConstants;
 import org.eclipse.jdt.launching.JavaRuntime;
 
 import org.apache.maven.plugin.Mojo;
@@ -50,6 +51,7 @@ import org.apache.maven.project.MavenProject;
 import org.eclipse.m2e.core.MavenPlugin;
 import org.eclipse.m2e.core.embedder.IMaven;
 import org.eclipse.m2e.core.project.IMavenProjectFacade;
+import org.eclipse.m2e.jdt.MavenExecutionJre;
 import org.eclipse.m2e.jdt.internal.launch.MavenRuntimeClasspathProvider;
 
 
@@ -77,29 +79,9 @@ public class UnitTestSupport {
   private static final String GET_INCLUDED_AND_EXCLUDED_TESTS_METHOD = "getIncludedAndExcludedTests";
 
   /**
-   * Launch configuration attribute for the main class
-   */
-  private static final String LAUNCH_CONFIG_MAIN_CLASS = "org.eclipse.jdt.launching.MAIN_TYPE";
-
-  /**
-   * Launch configuration attribute for the project
-   */
-  private static final String LAUNCH_CONFIG_PROJECT = "org.eclipse.jdt.launching.PROJECT_ATTR";
-
-  /**
-   * Launch configuration attribute for the VM arguments
-   */
-  public static final String LAUNCH_CONFIG_VM_ARGUMENTS = "org.eclipse.jdt.launching.VM_ARGUMENTS";
-
-  /**
    * Launch configuration attribute for the environment variables
    */
   public static final String LAUNCH_CONFIG_ENVIRONMENT_VARIABLES = "org.eclipse.debug.core.environmentVariables";
-
-  /**
-   * Launch configuration attribute for the system properties
-   */
-  private static final String LAUNCH_CONFIG_WORKING_DIRECTORY = "org.eclipse.jdt.launching.WORKING_DIRECTORY";
 
   /**
    * Launch configuration attribute for the working directory
@@ -147,9 +129,14 @@ public class UnitTestSupport {
   private static final String FAILSAFE_PLUGIN_ARTIFACT_ID = "maven-failsafe-plugin";
 
   /**
-   * deffered variable pattern
+   * deferred variable pattern
    */
   private static final Pattern DEFERRED_VAR_PATTERN = Pattern.compile("@\\{(.*?)\\}");
+
+  /**
+   * standard variable pattern
+   */
+  private static final Pattern STANDARD_VAR_PATTERN = Pattern.compile("\\$\\{(.*?)\\}");
 
   /**
    * maven group id for the maven plugins
@@ -214,7 +201,8 @@ public class UnitTestSupport {
             ILaunchConfiguration[] configurations = launchManager.getLaunchConfigurations(type);
             for(ILaunchConfiguration configuration : configurations) {
               // Check if the configuration is associated with the desired project and type 
-              String configurationProjectName = configuration.getAttribute(LAUNCH_CONFIG_PROJECT, "");
+              String configurationProjectName = configuration
+                  .getAttribute(IJavaLaunchConfigurationConstants.ATTR_PROJECT_NAME, "");
               if(project.getName().equals(configurationProjectName)) {
                 LOG.info("Reset launch configuration name: {}", configuration.getName());
                 setupLaunchConfiguration(configuration);
@@ -252,7 +240,7 @@ public class UnitTestSupport {
 
               // update the configuration only if arg extraction was successfull
               if(args != null) {
-                defineConfigurationValues(project, configuration, args);
+                defineConfigurationValues(project, configuration, args, MavenExecutionJre.forProject(facade, null));
               }
 
             }
@@ -267,7 +255,7 @@ public class UnitTestSupport {
      * Define the configuration values
      */
     private void defineConfigurationValues(IProject project, ILaunchConfiguration configuration,
-        TestLaunchArguments args) throws CoreException {
+        TestLaunchArguments args, Optional<MavenExecutionJre> mavenExecutionJre) throws CoreException {
 
       ILaunchConfigurationWorkingCopy copy = configuration.getWorkingCopy();
 
@@ -280,17 +268,19 @@ public class UnitTestSupport {
       }
       if(args.systemPropertyVariables() != null) {
         args.systemPropertyVariables().entrySet().stream() //
-            .filter(e -> e.getKey() != null && e.getValue() != null)
-            .forEach(e -> launchArguments.add("-D" + e.getKey() + "=" + e.getValue()));
+            .filter(e -> e.getKey() != null && e.getValue() != null
+                && !removeStandardVariablePlaceholders(e.getValue()).isEmpty())
+            .forEach(e -> launchArguments.add("-D" + e.getKey() + "=" + escapeValue(e.getValue())));
       }
-      copy.setAttribute(LAUNCH_CONFIG_VM_ARGUMENTS, launchArguments.toString());
+      copy.setAttribute(IJavaLaunchConfigurationConstants.ATTR_VM_ARGUMENTS, launchArguments.toString());
 
       try {
         if(args.workingDirectory() != null
             && !Files.isSameFile(project.getLocation().toPath().toAbsolutePath(), args.workingDirectory().toPath())) {
-          copy.setAttribute(LAUNCH_CONFIG_WORKING_DIRECTORY, args.workingDirectory().getAbsolutePath());
+          copy.setAttribute(IJavaLaunchConfigurationConstants.ATTR_WORKING_DIRECTORY,
+              args.workingDirectory().getAbsolutePath());
         } else {
-          copy.setAttribute(LAUNCH_CONFIG_WORKING_DIRECTORY, (String) null);
+          copy.setAttribute(IJavaLaunchConfigurationConstants.ATTR_WORKING_DIRECTORY, (String) null);
         }
       } catch(IOException ex) {
         LOG.error(ex.getMessage(), ex);
@@ -298,18 +288,31 @@ public class UnitTestSupport {
 
       if(args.environmentVariables() != null) {
         Map<String, String> filteredMap = args.environmentVariables().entrySet().stream()
-            .filter(entry -> entry.getKey() != null && entry.getValue() != null)
+            .filter(entry -> entry.getKey() != null && entry.getValue() != null
+                && !removeStandardVariablePlaceholders(entry.getValue()).isEmpty())
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         copy.setAttribute(LAUNCH_CONFIG_ENVIRONMENT_VARIABLES, filteredMap);
       }
 
+      // set the execution JRE if any
+      mavenExecutionJre.ifPresent(jre -> {
+        jre.getBestMatchingJreContainerPath()
+            .ifPresent(jreId -> copy.setAttribute(IJavaLaunchConfigurationConstants.ATTR_JRE_CONTAINER_PATH, jreId));
+      });
       copy.doSave();
+    }
+
+    private static String escapeValue(String raw) {
+      if(raw.contains(" ") || raw.contains("\t") || raw.contains("\r") || raw.contains("\n")) {
+        return "\"" + raw + "\"";
+      }
+      return raw;
     }
 
     private TestLaunchArguments getTestLaunchArguments(ILaunchConfiguration configuration, IMavenProjectFacade facade,
         IProgressMonitor monitor) throws CoreException {
 
-      String testClass = configuration.getAttribute(LAUNCH_CONFIG_MAIN_CLASS, "");
+      String testClass = configuration.getAttribute(IJavaLaunchConfigurationConstants.ATTR_MAIN_TYPE_NAME, "");
       MavenProject mavenProject = facade.getMavenProject();
 
       // find test executions
@@ -414,6 +417,8 @@ public class UnitTestSupport {
 
         String argLine = maven.getMojoParameterValue(mavenProject, execution, PLUGIN_ARGLINE, String.class, monitor);
         argLine = resolveDeferredVariables(mavenProject, argLine);
+        // resolve all placeholders which were not resolved previously by the empty string
+        argLine = removeStandardVariablePlaceholders(argLine);
 
         return new TestLaunchArguments(argLine,
             maven.getMojoParameterValue(mavenProject, execution, PLUGIN_SYSPROP_VARIABLES, Map.class, monitor),
@@ -426,29 +431,43 @@ public class UnitTestSupport {
       return null;
     }
 
-  }
-
-  /**
-   * This method is used to resolve deferred variables introduced by failsafe/surefire plugins in a given string value.
-   * Deferred variables are placeholders in the string that are replaced with actual values from the Maven project's
-   * properties. The placeholders are in the format @{...}, where ... is the key of the property. If a placeholder's
-   * corresponding property does not exist, the placeholder is left as is.
-   *
-   * @param mavenProject the Maven project from which to retrieve the properties
-   * @param value the string containing the placeholders to be replaced
-   * @return the string with all resolvable placeholders replaced with their corresponding property values
-   */
-  private static String resolveDeferredVariables(MavenProject mavenProject, String value) {
-    Properties properties = mavenProject.getProperties();
-    if(properties.isEmpty() || value == null) {
-      return value;
+    /**
+     * This method is used to resolve deferred variables introduced by failsafe/surefire plugins in a given string
+     * value. Deferred variables are placeholders in the string that are replaced with actual values from the Maven
+     * project's properties. The placeholders are in the format @{...}, where ... is the key of the property. If a
+     * placeholder's corresponding property does not exist the full placeholder is replaced by the empty string.
+     *
+     * @param mavenProject the Maven project from which to retrieve the properties
+     * @param value the string containing the placeholders to be replaced
+     * @return the string with all resolvable placeholders replaced with their corresponding property values (or empty
+     *         strings)
+     */
+    private static String resolveDeferredVariables(MavenProject mavenProject, String value) {
+      Properties properties = mavenProject.getProperties();
+      if(properties.isEmpty() || value == null) {
+        return "";
+      }
+      return DEFERRED_VAR_PATTERN.matcher(value).replaceAll(match -> {
+        String key = match.group(1);
+        String replacement = properties.getProperty(key);
+        return replacement != null ? replacement : "";
+      });
     }
-    return DEFERRED_VAR_PATTERN.matcher(value).replaceAll(match -> {
-      String placeholder = match.group();
-      String key = match.group(1);
-      String replacement = properties.getProperty(key);
-      return replacement != null ? replacement : placeholder;
-    });
+
+    /**
+     * This method is used to remove all standard variable placeholders in the format ${...} from a given string value.
+     * All placeholders are replaced with empty strings.
+     *
+     * @param value the string containing the placeholders to be removed
+     * @return the string with all placeholders removed
+     */
+    private static String removeStandardVariablePlaceholders(String value) {
+      if(value == null) {
+        return value;
+      }
+      return STANDARD_VAR_PATTERN.matcher(value).replaceAll("");
+    }
+
   }
 
   /**

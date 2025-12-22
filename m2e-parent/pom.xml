@@ -121,6 +121,7 @@
 								<ignore>jars/*.jar</ignore>
 								<ignore>Eclipse-SourceReferences</ignore>
 							</ignores>
+							<increment>100</increment>
 							<extensions>true</extensions>
 						</configuration>
 					</execution>
@@ -203,6 +204,11 @@
 					</dependencies>
 				</plugin>
 				<plugin>
+					<groupId>org.eclipse.tycho</groupId>
+					<artifactId>tycho-versions-plugin</artifactId>
+					<version>${tycho-version}</version>
+				</plugin>
+				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-dependency-plugin</artifactId>
 					<version>3.8.1</version>
@@ -215,6 +221,10 @@
 		<pluginRepository>
 			<id>cbi-releases</id>
 			<url>https://repo.eclipse.org/content/repositories/cbi-releases/</url>
+		</pluginRepository>
+		<pluginRepository>
+			<id>tycho-snapshots</id>
+			<url>https://repo.eclipse.org/content/repositories/tycho-snapshots/</url>
 		</pluginRepository>
 	</pluginRepositories>
 

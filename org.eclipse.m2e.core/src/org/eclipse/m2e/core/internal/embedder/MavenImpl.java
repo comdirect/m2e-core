@@ -81,6 +81,7 @@ import org.apache.maven.execution.MavenExecutionRequestPopulationException;
 import org.apache.maven.execution.MavenExecutionRequestPopulator;
 import org.apache.maven.execution.MavenExecutionResult;
 import org.apache.maven.execution.MavenSession;
+import org.apache.maven.execution.scope.internal.MojoExecutionScope;
 import org.apache.maven.lifecycle.LifecycleExecutor;
 import org.apache.maven.lifecycle.MavenExecutionPlan;
 import org.apache.maven.lifecycle.internal.LifecycleExecutionPlanCalculator;
@@ -97,6 +98,7 @@ import org.apache.maven.plugin.InvalidPluginDescriptorException;
 import org.apache.maven.plugin.MavenPluginManager;
 import org.apache.maven.plugin.Mojo;
 import org.apache.maven.plugin.MojoExecution;
+import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoNotFoundException;
 import org.apache.maven.plugin.PluginConfigurationException;
 import org.apache.maven.plugin.PluginDescriptorParsingException;
@@ -150,6 +152,7 @@ import org.eclipse.m2e.core.internal.IMavenConstants;
 import org.eclipse.m2e.core.internal.M2EUtils;
 import org.eclipse.m2e.core.internal.Messages;
 import org.eclipse.m2e.core.internal.preferences.MavenPreferenceConstants;
+import org.eclipse.m2e.internal.maven.compat.LifecycleExecutionPlanCalculatorFacade;
 
 
 @Component(service = {IMaven.class, IMavenConfigurationChangeListener.class})
@@ -203,8 +206,18 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
       MojoDescriptor mojoDescriptor = mojoExecution.getMojoDescriptor();
       // getPluginRealm creates plugin realm and populates pluginDescriptor.classRealm field
       lookup(BuildPluginManager.class).getPluginRealm(session, mojoDescriptor.getPluginDescriptor());
-      return clazz.cast(lookup(MavenPluginManager.class).getConfiguredMojo(Mojo.class, session, mojoExecution));
-    } catch(PluginManagerException | PluginConfigurationException | ClassCastException | PluginResolutionException ex) {
+      MojoExecutionScope scope = lookup(MojoExecutionScope.class);
+      try {
+        // Initialize MojoExecutionScope (for mojo's leveraging Sisu with JSR330 annotations, this is otherwise done by org.apache.maven.plugin.DefaultBuildPluginManager)
+        scope.enter();
+        scope.seed(MavenProject.class, session.getCurrentProject());
+        scope.seed(MojoExecution.class, mojoExecution);
+        return clazz.cast(lookup(MavenPluginManager.class).getConfiguredMojo(Mojo.class, session, mojoExecution));
+      } finally {
+        scope.exit();
+      }
+    } catch(PluginManagerException | PluginConfigurationException | ClassCastException | PluginResolutionException
+        | MojoExecutionException ex) {
       throw new CoreException(Status.error(NLS.bind(Messages.MavenImpl_error_mojo, mojoExecution), ex));
     }
   }
@@ -238,7 +251,8 @@ public class MavenImpl implements IMaven, IMavenConfigurationChangeListener {
       clone.setConfiguration(new Xpp3Dom(execution.getConfiguration()));
     }
     clone.setLifecyclePhase(execution.getLifecyclePhase());
-    LifecycleExecutionPlanCalculator executionPlanCalculator = lookup(LifecycleExecutionPlanCalculator.class);
+    LifecycleExecutionPlanCalculatorFacade executionPlanCalculator = new LifecycleExecutionPlanCalculatorFacade(
+        lookup(LifecycleExecutionPlanCalculator.class));
     try {
       executionPlanCalculator.setupMojoExecution(session, project, clone);
     } catch(Exception ex) {

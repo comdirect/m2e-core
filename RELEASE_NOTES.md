@@ -1,5 +1,31 @@
 # Eclipse m2e - Release notes
 
+## 2.10.0
+
+* 📅 Release Date: 03rd December 2025
+
+Various minor bug-fixes, enhancements and dependency updates.
+
+### Maven Execution JRE used for Tests
+
+Similar to what is done for the Maven Launch Actions the JRE for tests (TestNG, JUnit) is now also derived from
+the Maven execution JRE. Previously this was by default set to the project's JRE (derived from the `maven-compiler-plugin`s target/release configuration).
+The Maven execution JRE is determined from the `maven-enforcer-plugin`s `requireJavaVersion` rule by selecting the best matching installed JRE for the [configured Java version range](https://maven.apache.org/enforcer/enforcer-rules/requireJavaVersion.html).
+
+### Multi-Release-Jar support
+
+JDT added support for native [Multi-Release](https://openjdk.org/jeps/238) compilation support recently.
+With that present, m2e can now automatically support the [maven-compiler-plugin](https://maven.apache.org/plugins/maven-compiler-plugin/) option [`multiReleaseOutput`](https://maven.apache.org/plugins/maven-compiler-plugin/compile-mojo.html#multiReleaseOutput)
+and configure such projects accordingly.
+
+## 2.9.1
+
+* 📅 Release Date: 02nd September 2025
+
+### Embedded and use Maven 3.9.11
+
+Updated the embedded Maven from version 3.9.9 to 3.9.11; [Maven 3.9.11 Release Notes](https://maven.apache.org/docs/3.9.11/release-notes.html).
+
 ## 2.9.0
 
 * 📅 Release Date: 05th June 2025
