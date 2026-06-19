@@ -636,6 +636,12 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       } catch(IOException ex) {
         resourceDirectory = new File(directory).getAbsoluteFile();
       }
+      Path projectLocation = project.getLocation().toPath().toAbsolutePath().normalize();
+      Path resourcePath = resourceDirectory.toPath().toAbsolutePath().normalize();
+      if(projectLocation.startsWith(resourcePath) && !projectLocation.equals(resourcePath)) {
+        log.error("Skipping resource folder " + resourceDirectory);
+        continue;
+      }
       IContainer r = getFolder(project, resourceDirectory.getPath());
       if(r == project) {
         /*
@@ -724,32 +730,18 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
 
   protected void addJavaProjectOptions(Map<String, String> options, ProjectConfigurationRequest request,
       IProgressMonitor monitor) throws CoreException {
-    String source = null, target = null;
+    MojoExecution execution = getDefaultCompileExecution(getCompilerMojoExecutions(request, monitor));
+    String release = getCompilerLevel(request.mavenProject(), execution, "release", null, RELEASES, monitor);
+    //XXX ignoring testRelease option, since JDT doesn't support main/test classpath separation - yet
+    String source = getCompilerLevel(request.mavenProject(), execution, "source", null, SOURCES, monitor); //$NON-NLS-1$
+    String target = getCompilerLevel(request.mavenProject(), execution, "target", null, TARGETS, monitor); //$NON-NLS-1$
+    boolean generateParameters = isGenerateParameters(request.mavenProject(), execution, monitor);
+    boolean enablePreviewFeatures = isEnablePreviewFeatures(request.mavenProject(), execution, monitor);
 
-    //New release flag in JDK 9. See http://mail.openjdk.java.net/pipermail/jdk9-dev/2015-July/002414.html
-    String release = null;
-
-    boolean generateParameters = false;
-
-    boolean enablePreviewFeatures = false;
-
-    for(MojoExecution execution : getCompilerMojoExecutions(request, monitor)) {
-      String id = execution.getExecutionId();
-      if(!"default-compile".equals(id)) {
-        //Maven can have many but JDT only supports one config!
-        continue;
-      }
-      release = getCompilerLevel(request.mavenProject(), execution, "release", release, RELEASES, monitor);
-      //XXX ignoring testRelease option, since JDT doesn't support main/test classpath separation - yet
-      source = getCompilerLevel(request.mavenProject(), execution, "source", source, SOURCES, monitor); //$NON-NLS-1$
-      target = getCompilerLevel(request.mavenProject(), execution, "target", target, TARGETS, monitor); //$NON-NLS-1$
-      generateParameters = generateParameters || isGenerateParameters(request.mavenProject(), execution, monitor);
-      enablePreviewFeatures = enablePreviewFeatures
-          || isEnablePreviewFeatures(request.mavenProject(), execution, monitor);
-
-      // process -err:+deprecation , -warn:-serial ...
-      for(Object o : maven.getMojoParameterValue(request.mavenProject(), execution, "compilerArgs", List.class,
-          monitor)) {
+    // process -err:+deprecation , -warn:-serial ...
+    List<?> value = maven.getMojoParameterValue(request.mavenProject(), execution, "compilerArgs", List.class, monitor);
+    if(value != null) {
+      for(Object o : value) {
         if(o instanceof String compilerArg) {
           boolean err = false/*, warn = false*/;
           String[] settings = new String[0];
@@ -815,6 +807,21 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
       options.put(JavaCore.COMPILER_PB_REPORT_PREVIEW_FEATURES, JavaCore.IGNORE);
     }
 
+  }
+
+  private MojoExecution getDefaultCompileExecution(List<MojoExecution> executions) {
+    if(executions.isEmpty()) {
+      return null;
+    }
+    for(MojoExecution execution : executions) {
+      String id = execution.getExecutionId();
+      if("default-compile".equals(id)) {
+        //Maven can have many but JDT only supports one config so we prefer the default one
+        return execution;
+      }
+    }
+    //If no default is found
+    return executions.get(0);
   }
 
   /**
@@ -989,8 +996,8 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
   }
 
   protected IContainer getFolder(IProject project, String path) throws CoreException {
-    Path projectLocation = project.getLocation().toPath().toAbsolutePath();
-    Path folderPath = Path.of(path);
+    Path projectLocation = project.getLocation().toPath().toAbsolutePath().normalize();
+    Path folderPath = Path.of(path).normalize();
     if(projectLocation.equals(folderPath)) {
       return project;
     }
@@ -998,18 +1005,20 @@ public abstract class AbstractJavaProjectConfigurator extends AbstractProjectCon
     if(folderPath.isAbsolute()) {
       relativePath = getProjectRelativePath(project, folderPath);
     } else {
-      folderPath = projectLocation.resolve(path);
+      folderPath = projectLocation.resolve(path).normalize();
       relativePath = IPath.fromOSString(path);
     }
-    if(!project.exists(relativePath) && Files.exists(folderPath)
+    IFolder folder = project.getFolder(relativePath);
+    if((!project.exists(relativePath) || !folder.getProject().equals(project)) && Files.exists(folderPath)
         && !ResourcesPlugin.getWorkspace().getRoot().getLocation().toPath().equals(folderPath)) {
-      String linkName = projectLocation.relativize(folderPath).toString().replace("/", "_");
-      IFolder folder = project.getFolder(linkName);
+      Path relativized = projectLocation.relativize(folderPath);
+      String linkName = relativized.toString().replace("\\", "_").replace("/", "_");
+      folder = project.getFolder(linkName);
       createLinkWithRetry(folder, folderPath.toUri());
       folder.setPersistentProperty(LINKED_MAVEN_RESOURCE, "true");
       return folder;
     }
-    return project.getFolder(relativePath);
+    return folder;
   }
 
   /**

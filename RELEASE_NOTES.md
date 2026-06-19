@@ -1,5 +1,29 @@
 # Eclipse m2e - Release notes
 
+## 2.11.1
+
+* 📅 Release Date: 02nd June 2026
+
+Various bug-fixes, enhancements and dependency updates.
+
+### Embedded and use Maven 3.9.16
+
+Updated the embedded Maven from version 3.9.11 to 3.9.16; [Maven 3.9.16 Release Notes](https://maven.apache.org/docs/3.9.16/release-notes.html).
+
+## 2.11.0
+
+* 📅 Release Date: 04th March 2026
+
+### Embedded and use Maven 3.9.12
+
+Updated the embedded Maven from version 3.9.11 to 3.9.12; [Maven 3.9.12 Release Notes](https://maven.apache.org/docs/3.9.12/release-notes.html).
+
+### Stop producing explicit Source-Features
+
+Generating Source-Features is not recommended anymore and the functionality to generate them is deprecated in Tycho.
+Therefore, m2e does not generate Source-Features anymore.
+Source-Bundles, on the other hand, are of course still provided and can be made available in a development environment by setting the option in a Eclipse Target-Platform to include them.
+
 ## 2.10.0
 
 * 📅 Release Date: 03rd December 2025
